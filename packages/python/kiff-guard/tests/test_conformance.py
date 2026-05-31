@@ -159,6 +159,77 @@ def test_pydantic_ai_conformance():
     run_conformance(AdapterDriver(name="pydantic-ai", drive=_drive_pydantic_ai))
 
 
+# --- Strands: vote. BeforeToolCallEvent; callback sets event.cancel_tool
+#     to block. Strands runs the tool itself. ------------------------------
+def _drive_strands(guard, tool, args, *, will_run):
+    from kiff_guard.adapters.strands import kiff_before_tool_call
+
+    class _Event:
+        def __init__(self, name, a):
+            self.tool_use = {"name": name, "input": a, "toolUseId": "tu"}
+            self.cancel_tool = False
+
+    cb = kiff_before_tool_call(guard)
+    ev = _Event(tool, args)
+    cb(ev)
+    # Strands doesn't run the tool itself; "ran" = not cancelled.
+    return not bool(ev.cancel_tool)
+
+
+# --- Haystack: vote. ConfirmationStrategy.run(...) -> decision.execute. ----
+def _drive_haystack(guard, tool, args, *, will_run):
+    from kiff_guard.adapters.haystack import kiff_confirmation_strategy
+
+    class _Dec:
+        def __init__(self, execute):
+            self.execute = execute
+
+    strategy = kiff_confirmation_strategy(
+        guard, decision_factory=lambda name, tcid, execute, feedback="": _Dec(execute)
+    )
+    out = strategy.run(tool_name=tool, tool_description="", tool_params=args, tool_call_id="tc")
+    # Haystack runs the tool iff execute is True.
+    return bool(out.execute)
+
+
+# --- Microsoft Agent Framework: middleware (async). Drives the real core
+#     (run_guard_middleware) with a duck-typed context + async call_next. ---
+def _drive_microsoft_agent_framework(guard, tool, args, *, will_run):
+    import asyncio
+
+    from kiff_guard.adapters.microsoft_agent_framework_core import run_guard_middleware
+
+    ran = {"v": False}
+
+    class _Fn:
+        def __init__(self, name):
+            self.name = name
+
+    class _Ctx:
+        def __init__(self, name, a):
+            self.function = _Fn(name)
+            self.arguments = a
+            self.result = None
+
+    async def call_next():
+        ran["v"] = True
+
+    asyncio.run(run_guard_middleware(guard, _Ctx(tool, args), call_next))
+    return ran["v"]
+
+
+def test_strands_conformance():
+    run_conformance(AdapterDriver(name="strands", drive=_drive_strands))
+
+
+def test_haystack_conformance():
+    run_conformance(AdapterDriver(name="haystack", drive=_drive_haystack))
+
+
+def test_microsoft_agent_framework_conformance():
+    run_conformance(AdapterDriver(name="microsoft-agent-framework", drive=_drive_microsoft_agent_framework))
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
