@@ -23,7 +23,7 @@ from a blank policy file.
 
 ```
 packages/
-  python/kiff-guard/   # the Python SDK (shipped): core + 4 adapters
+  python/kiff-guard/   # the Python SDK (shipped): core + 9 adapters
   js/                  # the TypeScript SDK (planned — see below)
 ```
 
@@ -58,8 +58,13 @@ agent = Agent(model=..., tools=[...], tool_hooks=[agno_hook(guard)])
 | LangGraph / LangChain | py | middleware (`wrap_tool_call`) | shipped |
 | Hermes (Nous) | py | vote (`pre_tool_call` plugin hook) | shipped |
 | OpenAI Agents SDK | py | vote (tool input guardrail) | shipped |
+| Google ADK | py | vote (`before_tool_callback`) | shipped |
+| Pydantic AI | py | vote (`before_tool_execute` hook) | shipped |
+| Strands Agents | py | vote (`BeforeToolCallEvent`) | shipped |
+| Haystack Agents | py | vote (`ConfirmationStrategy`) | shipped |
+| Microsoft Agent Framework | py | middleware (`FunctionMiddleware`, async) | shipped |
 | OpenClaw | **ts** | vote (`before_tool_call`) | planned (needs the JS SDK) |
-| Pydantic AI, Google ADK, Microsoft Agent Framework, Strands, Haystack, LlamaIndex | py | — | planned |
+| LlamaIndex | py | — | planned |
 
 Two integration shapes: **middleware** (the guard runs the tool via a
 handler continuation) and **vote / inverted-control** (the framework runs
