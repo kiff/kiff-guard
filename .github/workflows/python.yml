@@ -78,3 +78,48 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev,pydantic-ai]"
       - run: python -m pytest tests/ -q -k "pydantic_ai or conformance or guard_core"
+
+  adapter-strands:
+    name: adapter (strands @ latest)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # community/best-effort tier
+    defaults:
+      run:
+        working-directory: packages/python/kiff-guard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,strands]"
+      - run: python -m pytest tests/ -q -k "strands or conformance or guard_core"
+
+  adapter-haystack:
+    name: adapter (haystack @ latest)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # community/best-effort tier
+    defaults:
+      run:
+        working-directory: packages/python/kiff-guard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,haystack]"
+      - run: python -m pytest tests/ -q -k "haystack or conformance or guard_core"
+
+  adapter-microsoft-agent-framework:
+    name: adapter (microsoft-agent-framework @ latest)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # community/best-effort tier
+    defaults:
+      run:
+        working-directory: packages/python/kiff-guard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,microsoft-agent-framework]"
+      - run: python -m pytest tests/ -q -k "microsoft_agent_framework or conformance or guard_core"

@@ -81,7 +81,10 @@ once; an adapter adds no governance logic of its own.
 | OpenAI Agents SDK | `kiff_guard.adapters.openai_agents` | shipped |
 | Google ADK | `kiff_guard.adapters.google_adk` | shipped |
 | Pydantic AI | `kiff_guard.adapters.pydantic_ai` | shipped |
-| Microsoft Agent Framework, Strands, Haystack, LlamaIndex | — | planned |
+| Strands Agents | `kiff_guard.adapters.strands` | shipped |
+| Haystack Agents | `kiff_guard.adapters.haystack` | shipped |
+| Microsoft Agent Framework | `kiff_guard.adapters.microsoft_agent_framework` | shipped |
+| LlamaIndex | — | planned |
 | OpenClaw (TypeScript) | needs `kiff-guard-js` | planned |
 
 See the framework survey on kiffhq/kiff-cloud#239 for each one's seam,
