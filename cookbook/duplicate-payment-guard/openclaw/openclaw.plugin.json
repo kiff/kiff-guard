@@ -1,0 +1,19 @@
+{
+  "id": "kiff-guard-demo",
+  "name": "KIFF Guard Demo",
+  "description": "Pay-invoice tool gated by KIFF clearance (before_tool_call).",
+  "version": "0.1.0",
+  "activation": { "onStartup": true },
+  "contracts": {
+    "tools": ["pay_invoice"],
+    "hooks": ["before_tool_call"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "kiffBaseUrl": { "type": "string" },
+      "apAppUrl": { "type": "string" }
+    }
+  }
+}
