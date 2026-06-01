@@ -24,7 +24,7 @@ from a blank policy file.
 ```
 packages/
   python/kiff-guard/   # the Python SDK (shipped): core + 9 adapters
-  js/                  # the TypeScript SDK (planned — see below)
+  js/                  # the TypeScript SDK (shipped): core + OpenClaw adapter
 ```
 
 The guard is a **framework-agnostic core** plus **thin adapters**, one
@@ -63,7 +63,7 @@ agent = Agent(model=..., tools=[...], tool_hooks=[agno_hook(guard)])
 | Strands Agents | py | vote (`BeforeToolCallEvent`) | shipped |
 | Haystack Agents | py | vote (`ConfirmationStrategy`) | shipped |
 | Microsoft Agent Framework | py | middleware (`FunctionMiddleware`, async) | shipped |
-| OpenClaw | **ts** | vote (`before_tool_call`) | planned (needs the JS SDK) |
+| OpenClaw | **ts** | vote (`before_tool_call`) | shipped (`@kiffhq/kiff-guard/adapters/openclaw`; seam + contract verified) |
 | LlamaIndex | py | — | planned |
 
 Two integration shapes: **middleware** (the guard runs the tool via a

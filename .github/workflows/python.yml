@@ -123,3 +123,24 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev,microsoft-agent-framework]"
       - run: python -m pytest tests/ -q -k "microsoft_agent_framework or conformance or guard_core"
+
+  # TypeScript SDK (packages/js): typecheck + the vitest suite (guard
+  # core, conformance, OpenClaw adapter). Mirrors the Python `test` job.
+  js:
+    name: js (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20", "22"]
+    defaults:
+      run:
+        working-directory: packages/js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
