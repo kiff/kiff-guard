@@ -32,6 +32,11 @@ docker run -d --name openclaw \
   -e OPENCLAW_DISABLE_BONJOUR=1 \
   -e KIFF_BASE_URL="http://localhost:8081" \
   -e AP_APP_URL="http://localhost:8082" \
+  -e KIFF_CLOUD_API_KEY="${KIFF_CLOUD_API_KEY:-}" \
+  -e KIFF_CLOUD_API_URL="${KIFF_CLOUD_API_URL:-https://api.kiff.dev}" \
+  -e KIFF_CLOUD_PROJECT="${KIFF_CLOUD_PROJECT:-cookbook}" \
+  -e KIFF_CLOUD_ENVIRONMENT="${KIFF_CLOUD_ENVIRONMENT:-aws}" \
+  -e KIFF_CLOUD_WORKFLOW="${KIFF_CLOUD_WORKFLOW:-duplicate-payment}" \
   -v "$CFG:/home/node/.openclaw" \
   -v "$SECRETS:/home/node/.config/openclaw" \
   kiff-cookbook-openclaw:local \

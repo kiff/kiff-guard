@@ -59,6 +59,32 @@ export interface GuardConnection {
   seenCount?: number;
 }
 
+export interface GuardToolObservation {
+  name: string;
+  description?: string;
+  parameterSchema?: Record<string, unknown>;
+  entityArg?: string;
+  action?: string;
+  entityType?: string;
+  required?: string[];
+  observedCallCount?: number;
+}
+
+export interface GuardObservationInput extends GuardConnectInput {
+  tools: GuardToolObservation[];
+}
+
+export interface GuardObservation {
+  tenantId?: string;
+  project: string;
+  environment: string;
+  agentId: string;
+  workflow: string;
+  tools: GuardToolObservation[];
+  observedAt?: string;
+  updatedAt?: string;
+}
+
 /** Optional client capability for registering a live guard runtime. */
 export interface GuardConnector {
   connectGuard(input: GuardConnectInput): Promise<GuardConnection>;
@@ -212,6 +238,39 @@ export class HTTPClient implements Client {
     return normalizeGuardConnection(payload);
   }
 
+  async observeGuard(input: GuardObservationInput): Promise<GuardObservation> {
+    if (!input.agentId) {
+      throw new Error("agentId is required");
+    }
+    if (!input.adapter) {
+      throw new Error("adapter is required");
+    }
+
+    const body: Record<string, unknown> = {
+      agent_id: input.agentId,
+      adapter: input.adapter,
+      mode: input.mode,
+      tools: input.tools.map(wireToolObservation),
+    };
+    if (input.project) body.project = input.project;
+    if (input.environment) body.environment = input.environment;
+    if (input.workflow) body.workflow = input.workflow;
+    if (input.sdkVersion) body.sdk_version = input.sdkVersion;
+
+    const { status, payload } = await this.post("/v1/guard/observations", body);
+    if (status === 0) {
+      const message = typeof payload.message === "string" ? payload.message : "transport error";
+      throw new Error(message);
+    }
+    if (status < 200 || status >= 300) {
+      const message =
+        typeof payload.error === "string" ? payload.error : `observations returned status ${status}`;
+      throw new Error(message);
+    }
+
+    return normalizeGuardObservation(payload.observation ?? payload);
+  }
+
   private async post(
     path: string,
     body: Record<string, unknown>,
@@ -249,6 +308,18 @@ export class HTTPClient implements Client {
   }
 }
 
+function wireToolObservation(tool: GuardToolObservation): Record<string, unknown> {
+  const body: Record<string, unknown> = { name: tool.name };
+  if (tool.description) body.description = tool.description;
+  if (tool.parameterSchema) body.parameter_schema = tool.parameterSchema;
+  if (tool.entityArg) body.entity_arg = tool.entityArg;
+  if (tool.action) body.action = tool.action;
+  if (tool.entityType) body.entity_type = tool.entityType;
+  if (tool.required) body.required = tool.required;
+  if (tool.observedCallCount !== undefined) body.observed_call_count = tool.observedCallCount;
+  return body;
+}
+
 function normalizeGuardConnection(payload: Record<string, any>): GuardConnection {
   const mode = payload.mode === "enforce" ? "enforce" : "observe";
   return {
@@ -263,6 +334,37 @@ function normalizeGuardConnection(payload: Record<string, any>): GuardConnection
     firstSeenAt: stringOrUndefined(payload.first_seen_at),
     lastSeenAt: stringOrUndefined(payload.last_seen_at),
     seenCount: typeof payload.seen_count === "number" ? payload.seen_count : undefined,
+  };
+}
+
+function normalizeGuardObservation(payload: Record<string, any>): GuardObservation {
+  const tools = Array.isArray(payload.tools)
+    ? payload.tools.map((tool: Record<string, any>) => ({
+        name: stringOrDefault(tool.name, ""),
+        description: stringOrUndefined(tool.description),
+        parameterSchema:
+          tool.parameter_schema && typeof tool.parameter_schema === "object"
+            ? tool.parameter_schema
+            : undefined,
+        entityArg: stringOrUndefined(tool.entity_arg),
+        action: stringOrUndefined(tool.action),
+        entityType: stringOrUndefined(tool.entity_type),
+        required: Array.isArray(tool.required)
+          ? tool.required.filter((v: unknown): v is string => typeof v === "string")
+          : undefined,
+        observedCallCount:
+          typeof tool.observed_call_count === "number" ? tool.observed_call_count : undefined,
+      }))
+    : [];
+  return {
+    tenantId: stringOrUndefined(payload.tenant_id),
+    project: stringOrDefault(payload.project, "default"),
+    environment: stringOrDefault(payload.environment, "dev"),
+    agentId: stringOrDefault(payload.agent_id, ""),
+    workflow: stringOrDefault(payload.workflow, "default"),
+    tools,
+    observedAt: stringOrUndefined(payload.observed_at),
+    updatedAt: stringOrUndefined(payload.updated_at),
   };
 }
 

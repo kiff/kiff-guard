@@ -55,6 +55,150 @@ The script:
 
 ## Manual deploy (local or custom infra)
 
+### How the AWS deploy actually works — the non-obvious parts
+
+This recipe has three pieces that are not obvious from the docs and caused
+integration friction. They are documented here so anyone reproducing the deploy
+doesn't have to rediscover them.
+
+---
+
+**1. The published `openclaw-sdk` npm package is protocol-incompatible with
+recent gateways.**
+
+`openclaw-sdk@2026.3.x` speaks WebSocket protocol 1; current gateway images
+(2026.4+) require protocol 3/4. The handshake fails immediately with
+`protocol mismatch`. The solution: **bypass the SDK entirely** and speak the
+gateway protocol directly with a 50-line raw-WebSocket client (`driver/ocgw.mjs`).
+
+The client uses the documented **trusted same-process backend path**:
+
+```json
+{
+  "type": "req",
+  "method": "connect",
+  "params": {
+    "minProtocol": 3,  "maxProtocol": 4,
+    "client": { "id": "gateway-client", "mode": "backend", "version": "0.1.0", "platform": "node" },
+    "role": "operator",
+    "scopes": ["operator.read", "operator.write", "operator.approvals", "operator.admin"],
+    "auth": { "token": "<OPENCLAW_GATEWAY_TOKEN>" }
+  }
+}
+```
+
+`client.id` must be exactly `"gateway-client"` (not an arbitrary string) and
+`client.mode` must be `"backend"`. This path **skips device pairing** and works
+on loopback with the shared gateway token. Do not use `clientId: "my-app"` — the
+gateway will reject it with "must be equal to one of the allowed values."
+
+The agent-run RPC takes `agentId`, `sessionKey`, `message`, `model`, and
+`idempotencyKey` (all four required). It returns immediately with a `runId`;
+call `agent.wait({ runId })` to block until done.
+
+---
+
+**2. External plugins cannot be runtime-mounted into the packaged image.**
+
+Three paths that do NOT work:
+- `plugins.load.paths: ["/path/to/dist/index.js"]` — ignored by the packaged
+  runtime's plugin discovery.
+- Mounting the plugin dir at `/app/extensions/<id>` via `-v` — replaces the
+  *entire* `/app/extensions` tree, dropping all bundled plugins.
+- `openclaw plugins install ./path` — fails on the peer-dep link for `openclaw`
+  (the image can't create `node_modules/openclaw` symlinks for user-installed
+  plugins).
+
+The solution: **build a derived image** (`openclaw/Dockerfile`) that copies the
+plugin into `/app/dist/extensions/<id>` at build time and creates the
+`node_modules/openclaw` peer symlink as root before switching to `USER node`.
+The baked plugin resolves `openclaw/plugin-sdk/*` from the image's own `/app`.
+
+The peer link:
+
+```dockerfile
+RUN ln -sf /app "$EXT/node_modules/openclaw" && chown -R node:node "$EXT"
+```
+
+---
+
+**3. The gateway config schema is strict — unknown or wrong-type fields cause a
+startup failure.** Key requirements for `ghcr.io/openclaw/openclaw:latest`:
+
+- `models.providers.openai.models` must be an **array of objects** with both
+  `id` and `name` — bare strings `["gpt-4o-mini"]` or objects with only `id`
+  are rejected.
+- `agents.defaults.models["openai/gpt-4o-mini"].agentRuntime.id` must be set
+  to `"openclaw"`. Without it, the agent uses the `codex` harness by default and
+  fails with `Unknown model: openai-codex/gpt-4o-mini`.
+- The `plugins.allow` list must exactly match the plugin manifest `id` field.
+
+Minimal working config:
+
+```json
+{
+  "models": {
+    "providers": {
+      "openai": {
+        "apiKey": { "source": "env", "provider": "default", "id": "OPENAI_API_KEY" },
+        "models": [{ "id": "gpt-4o-mini", "name": "gpt-4o-mini" }]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": { "primary": "openai/gpt-4o-mini" },
+      "models": { "openai/gpt-4o-mini": { "agentRuntime": { "id": "openclaw" } } }
+    }
+  }
+}
+```
+
+---
+
+**4. The `@kiffhq/kiff-guard` vendor dep is a symlink in development — use
+`cp -rL` (dereference) when copying it.**
+
+The plugin's `node_modules/@kiffhq/kiff-guard` resolves via a `file:` reference
+in `package.json` and is a symlink in the source tree. `cp -r` follows the
+symlink but the relative target breaks once moved. `cp -rL` dereferences it into
+real files. The Dockerfile handles this via `COPY vendor/kiff-guard $EXT/...`
+from the recipe root.
+
+---
+
+**Verified step order (the one that works, on Amazon Linux 2023 / t3.large):**
+
+```bash
+# 1. bootstrap (via EC2 user-data or manually):
+dnf install -y docker git && systemctl enable --now docker && usermod -aG docker ec2-user
+# install Go 1.23 and Node 22 from their official sources
+
+# 2. build kiff-decide (do this AFTER bootstrap, before OpenClaw):
+cd kiff-decide && go build -o kiff-decide .   # fetches github.com/kiffhq/kiff v0.2.0
+
+# 3. start core services (detached, before OpenClaw):
+bash start-core.sh    # kiff-decide on :8081, ap-app on :8082
+
+# 4. pull + build the derived OpenClaw image:
+docker pull ghcr.io/openclaw/openclaw:latest
+docker build -t kiff-cookbook-openclaw:local -f openclaw/Dockerfile .
+
+# 5. run the gateway (host network, so it reaches :8081 and :8082):
+bash start-openclaw.sh    # waits for /healthz, exits when HEALTHY
+
+# 6. install driver deps + run scenario:
+cd driver && npm install ws
+node scenario.mjs
+```
+
+The `start-core.sh` and `start-openclaw.sh` scripts handle all of this; the
+breakdown above is for debugging or adapting to different infra.
+
+---
+
+
+
 ### 1. Start core services
 
 ```bash
@@ -75,12 +219,6 @@ node server.js  # listens on :8082
 export OPENAI_API_KEY="sk-proj-..."
 export OPENCLAW_GATEWAY_TOKEN="$(openssl rand -hex 32)"
 echo "$OPENCLAW_GATEWAY_TOKEN" > .env
-
-# Optional: make this runtime appear in KIFF Cloud's dashboard.
-export KIFF_CLOUD_API_KEY="kiff_live_..."
-export KIFF_CLOUD_PROJECT="cookbook"
-export KIFF_CLOUD_ENVIRONMENT="local"
-export KIFF_CLOUD_WORKFLOW="duplicate-payment"
 
 # Build the derived image (plugin baked into /app/dist/extensions)
 docker build -t kiff-cookbook-openclaw:local -f openclaw/Dockerfile .
