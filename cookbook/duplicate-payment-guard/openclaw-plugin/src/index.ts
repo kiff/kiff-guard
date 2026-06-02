@@ -53,13 +53,16 @@ const client = new HTTPClient({
 // blocks the tool. fail-closed by default.
 const guard = new Guard({ client, tenant: "demo", agent: "ap-agent", mode: "enforce" });
 
-const cloudGuard = KIFF_CLOUD_API_KEY
+const cloudClient = KIFF_CLOUD_API_KEY
+  ? new HTTPClient({
+      apiKey: KIFF_CLOUD_API_KEY,
+      toolMap,
+      baseUrl: KIFF_CLOUD_API_URL,
+    })
+  : undefined;
+const cloudGuard = cloudClient
   ? new Guard({
-      client: new HTTPClient({
-        apiKey: KIFF_CLOUD_API_KEY,
-        toolMap,
-        baseUrl: KIFF_CLOUD_API_URL,
-      }),
+      client: cloudClient,
       tenant: "cloud",
       agent: "ap-agent",
       mode: "enforce",
@@ -68,7 +71,7 @@ const cloudGuard = KIFF_CLOUD_API_KEY
 let warnedCloudRegistration = false;
 
 function refreshCloudConnection(): void {
-  if (!cloudGuard) return;
+  if (!cloudGuard || !cloudClient) return;
   void cloudGuard
     .connect({
       adapter: "openclaw",
@@ -77,6 +80,40 @@ function refreshCloudConnection(): void {
       workflow: KIFF_CLOUD_WORKFLOW,
       sdkVersion: VERSION,
     })
+    .then(() =>
+      cloudClient.observeGuard({
+        agentId: "ap-agent",
+        adapter: "openclaw",
+        mode: "enforce",
+        project: KIFF_CLOUD_PROJECT,
+        environment: KIFF_CLOUD_ENVIRONMENT,
+        workflow: KIFF_CLOUD_WORKFLOW,
+        sdkVersion: VERSION,
+        tools: [
+          {
+            name: "pay_invoice",
+            description:
+              "Pay an outstanding invoice by id. Debits the account and marks the invoice paid.",
+            entityArg: "invoice_id",
+            action: "PAY_INVOICE",
+            entityType: "Invoice",
+            required: ["amount_cents"],
+            parameterSchema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                invoice_id: {
+                  type: "string",
+                  description: "The invoice id to pay, e.g. inv-001.",
+                },
+                amount_cents: { type: "integer", description: "Amount in cents." },
+              },
+              required: ["invoice_id", "amount_cents"],
+            },
+          },
+        ],
+      }),
+    )
     .catch((err) => {
       if (warnedCloudRegistration) return;
       warnedCloudRegistration = true;

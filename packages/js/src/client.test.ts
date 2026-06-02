@@ -83,3 +83,96 @@ describe("HTTPClient.connectGuard", () => {
     ).rejects.toThrow(/invalid adapter/);
   });
 });
+
+describe("HTTPClient.observeGuard", () => {
+  it("posts an observed tool catalog to KIFF Cloud", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(
+        JSON.stringify({
+          observation: {
+            tenant_id: "tenant_1",
+            project: "cookbook",
+            environment: "aws",
+            agent_id: "ap-agent",
+            workflow: "duplicate-payment",
+            tools: [
+              {
+                name: "pay_invoice",
+                entity_arg: "invoice_id",
+                action: "PAY_INVOICE",
+                entity_type: "Invoice",
+                required: ["amount_cents"],
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    const client = new HTTPClient({
+      apiKey: "kiff_live_test",
+      toolMap: new ToolMap(),
+      baseUrl: "https://api.example.test/",
+      fetchImpl,
+    });
+
+    const observation = await client.observeGuard({
+      agentId: "ap-agent",
+      adapter: "openclaw",
+      mode: "enforce",
+      project: "cookbook",
+      environment: "aws",
+      workflow: "duplicate-payment",
+      sdkVersion: "0.1.0",
+      tools: [
+        {
+          name: "pay_invoice",
+          description: "Pay an outstanding invoice",
+          entityArg: "invoice_id",
+          action: "PAY_INVOICE",
+          entityType: "Invoice",
+          required: ["amount_cents"],
+          parameterSchema: {
+            type: "object",
+            required: ["invoice_id", "amount_cents"],
+          },
+        },
+      ],
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe("https://api.example.test/v1/guard/observations");
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
+      agent_id: "ap-agent",
+      adapter: "openclaw",
+      mode: "enforce",
+      project: "cookbook",
+      environment: "aws",
+      workflow: "duplicate-payment",
+      sdk_version: "0.1.0",
+      tools: [
+        {
+          name: "pay_invoice",
+          description: "Pay an outstanding invoice",
+          entity_arg: "invoice_id",
+          action: "PAY_INVOICE",
+          entity_type: "Invoice",
+          required: ["amount_cents"],
+          parameter_schema: {
+            type: "object",
+            required: ["invoice_id", "amount_cents"],
+          },
+        },
+      ],
+    });
+    expect(observation.tools[0]).toMatchObject({
+      name: "pay_invoice",
+      entityArg: "invoice_id",
+      action: "PAY_INVOICE",
+      entityType: "Invoice",
+    });
+  });
+});
