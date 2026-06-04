@@ -33,11 +33,48 @@ from urllib import request as urllib_request
 from .decision import Decision, INVALID
 
 
+@dataclass
+class GuardConnection:
+    """Returned by connect_guard: the cloud's acknowledgement that this
+    runtime is registered and will appear in the dashboard."""
+
+    runtime_id: str
+    heartbeat_interval: str
+    tenant_id: str
+    project: str
+    environment: str
+    agent_id: str
+    workflow: str
+    adapter: str
+    mode: str
+    sdk_version: str = ""
+    first_seen_at: str = ""
+    last_seen_at: str = ""
+    seen_count: int = 0
+
+
 class Client(Protocol):
     """What the guard needs from a decider. Implemented by HTTPClient;
     tests can pass any object with this method."""
 
     def decide(self, tenant: str, agent: str, tool: str, args: Dict[str, Any]) -> Decision:
+        ...
+
+
+class GuardConnector(Protocol):
+    """Optional client capability for registering a live guard runtime
+    with KIFF Cloud. Mirrors the TS SDK's GuardConnector interface."""
+
+    def connect_guard(
+        self,
+        agent_id: str,
+        adapter: str,
+        mode: str,
+        project: str = "",
+        environment: str = "",
+        workflow: str = "",
+        sdk_version: str = "",
+    ) -> GuardConnection:
         ...
 
 
@@ -122,6 +159,57 @@ class HTTPClient:
         message = str(payload.get("message", ""))
         reason = message or (", ".join(reasons) if reasons else outcome)
         return Decision(outcome=outcome, reason=reason, proposal_id=str(payload.get("proposal_id", "")))
+
+    def connect_guard(
+        self,
+        agent_id: str,
+        adapter: str,
+        mode: str,
+        project: str = "",
+        environment: str = "",
+        workflow: str = "",
+        sdk_version: str = "",
+    ) -> GuardConnection:
+        """Register this guard runtime with KIFF Cloud. The runtime will
+        appear in the dashboard grouped by project/environment/agent/workflow.
+        Call periodically (every 60s) as a heartbeat."""
+        body: Dict[str, Any] = {
+            "agent_id": agent_id,
+            "adapter": adapter,
+            "mode": mode,
+        }
+        if project:
+            body["project"] = project
+        if environment:
+            body["environment"] = environment
+        if workflow:
+            body["workflow"] = workflow
+        if sdk_version:
+            body["sdk_version"] = sdk_version
+
+        status, payload = self._post("/v1/guard/connect", body)
+        if status == 0:
+            message = payload.get("message", "transport error") if payload else "transport error"
+            raise ConnectionError(f"guard connect failed: {message}")
+        if status < 200 or status >= 300:
+            message = payload.get("error", f"connect returned status {status}") if payload else f"connect returned status {status}"
+            raise ConnectionError(f"guard connect failed: {message}")
+
+        return GuardConnection(
+            runtime_id=str(payload.get("runtime_id", "")),
+            heartbeat_interval=str(payload.get("heartbeat_interval", "60s")),
+            tenant_id=str(payload.get("tenant_id", "")),
+            project=str(payload.get("project", "")),
+            environment=str(payload.get("environment", "")),
+            agent_id=str(payload.get("agent_id", "")),
+            workflow=str(payload.get("workflow", "")),
+            adapter=str(payload.get("adapter", "")),
+            mode=str(payload.get("mode", "")),
+            sdk_version=str(payload.get("sdk_version", "")),
+            first_seen_at=str(payload.get("first_seen_at", "")),
+            last_seen_at=str(payload.get("last_seen_at", "")),
+            seen_count=int(payload.get("seen_count", 0)),
+        )
 
     def _post(self, path: str, body: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
         url = self._base + path

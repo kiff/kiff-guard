@@ -116,13 +116,19 @@ Each recipe is a **complete, runnable proof**: real models, real agent
 frameworks, real side effects, real KIFF runtime. Deploy locally or on
 your own infra, run the scenario, see the verdict.
 
-**Recipe #1: [duplicate-payment-guard](./cookbook/duplicate-payment-guard/)**  
-An AP agent pays a $10,000 invoice. A flaky connection drops the success
-response → the transport retries 10 times → each retry would debit again
-($100,000 risk). KIFF blocks the retries because the invoice is now PAID.
+| # | Recipe | Adapter | Verdict |
+|---|--------|---------|---------|
+| 1 | [duplicate-payment-guard](./cookbook/duplicate-payment-guard/) | OpenClaw (TS) | $100K → $10K, 9 blocked |
+| 2 | [refund-ceiling-guard](./cookbook/refund-ceiling-guard/) | LangGraph | $250 → $100, 3 blocked |
+| 3 | [collections-promise-guard](./cookbook/collections-promise-guard/) | Agno | 5 contacts → 1, 4 blocked |
+| 4 | [chargeback-dispute-guard](./cookbook/chargeback-dispute-guard/) | Strands | $125 → $25, 4 blocked |
+| 5 | [vulnerability-escalation-guard](./cookbook/vulnerability-escalation-guard/) | Agno **Teams** | 6 actions → 1, whole team halted by one event |
+| 6 | [kyb-verification-guard](./cookbook/kyb-verification-guard/) | Agno **Workflows** | $60 → $12, 4 blocked (once-and-done) |
 
-Verdict: WITHOUT KIFF = $100,000 / 10 debits; WITH KIFF = $10,000 / 1
-debit, 9 blocked.
+Recipes 5 and 6 also show **framework guardrails PLUS KIFF**: Agno's
+`PIIDetectionGuardrail` (a `pre_hook`, input safety) and KIFF (a
+`tool_hook`, action authority) running side by side — different layers,
+not competitors.
 
 ## License
 

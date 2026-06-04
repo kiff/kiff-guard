@@ -1,0 +1,6 @@
+agno>=1.4.0
+openai>=1.0.0
+# Agno's Workflow module (agno.workflow) imports fastapi transitively.
+# Required for the structured Workflow path; without it the recipe degrades
+# to running the verify agent directly (same KIFF guarantee, no pipeline).
+fastapi>=0.110.0
