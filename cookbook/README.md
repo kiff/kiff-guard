@@ -2,64 +2,110 @@
 
 Real-world recipes proving KIFF stops risky agent actions before they execute.
 
-Each recipe is a **complete, runnable proof**: real models, real agent frameworks, real side effects, real KIFF runtime. Deploy locally or on your own infra, run the scenario, see the verdict.
+Each recipe is a **complete, runnable proof**: real models, real agent frameworks,
+real side effects, real KIFF runtime. Every recipe connects to KIFF Cloud so
+decisions and receipts are visible in the dashboard.
 
 ## Recipes
 
-### 1. [duplicate-payment-guard](./duplicate-payment-guard/)
+| # | Recipe | Scenario | Adapter | Proof |
+|---|--------|----------|---------|-------|
+| 1 | [duplicate-payment-guard](./duplicate-payment-guard/) | AP agent retries a $10K payment 10× → $100K risk | OpenClaw (TS) | $100K → $10K, 9 blocked |
+| 2 | [refund-ceiling-guard](./refund-ceiling-guard/) | Support agent retries a $50 refund 5× on a $100 order → $250 refunded | LangGraph | $250 → $100, 3 blocked |
+| 3 | [collections-promise-guard](./collections-promise-guard/) | Collections agent contacts a borrower after a promise to pay → FDCPA/CONC risk | Agno | 5 contacts → 1, 4 blocked |
+| 4 | [chargeback-dispute-guard](./chargeback-dispute-guard/) | Disputes agent submits same chargeback 5× → $125 in scheme fees | Strands | $125 → $25, 4 blocked |
+| 5 | [vulnerability-escalation-guard](./vulnerability-escalation-guard/) | A whole customer-ops **team** keeps acting after a vulnerability signal → FCA Consumer Duty failure | Agno **Teams** | 6 actions → 1, whole team halted by one event |
+| 6 | [kyb-verification-guard](./kyb-verification-guard/) | A KYB **workflow** re-runs a paid bureau check 5× → $60 + re-screening | Agno **Workflows** | $60 → $12, 4 blocked (once-and-done) |
 
-**The problem**: An AP agent pays a $10,000 invoice. A flaky connection drops the success response → the transport retries 10 times → each retry would debit again ($100,000 risk).
+## What each recipe proves
 
-**The proof**: KIFF blocks the retries because the invoice is now PAID (`state_not_allowed`). Each individual call is legitimate; only a state-aware gate stops the emergent repeat.
+All recipes share the same architecture and proof pattern:
 
-**What's proven**:
-- Real OpenAI model (gpt-4o-mini)
-- Real agent framework (OpenClaw gateway)
-- Real KIFF runtime (public framework v0.2.0)
-- Real guard SDK (kiff-guard-js with OpenClaw adapter)
-- Real system of record (deliberately non-idempotent)
+1. **WITHOUT KIFF** — the ungoverned baseline shows what happens when agents retry or over-act: money lost, fees incurred, regulations violated.
+2. **WITH KIFF** — a real LLM (gpt-4o-mini) running in a real agent framework makes the first legitimate call. KIFF allows it, state advances. Every later action the state forbids is blocked.
+3. **KIFF Cloud** — each recipe registers a live runtime in the dashboard. Receipts, decisions, and audit trail visible in real time, kept active by a heartbeat.
 
-**Verdict**: WITHOUT KIFF = $100,000 / 10 debits; WITH KIFF = $10,000 / 1 debit, 9 blocked.
+## Guardrails PLUS KIFF — different layers, they stack
 
-**Architecture**: 3 microservices (kiff-decide gate, ap-app system-of-record, openclaw gateway with baked plugin). Deploys to EC2 or runs locally.
+KIFF is **not** a guardrails replacement. Framework guardrails answer *"is
+the input safe?"* (PII, prompt injection, moderation, schema). KIFF answers
+*"may this action run, given state + policy?"*. They sit at different points
+and compose:
 
----
+```python
+agent = Agent(
+    model=OpenAIChat(id="gpt-4o-mini"),
+    tools=[offer_product],
+    pre_hooks=[PIIDetectionGuardrail()],   # framework guardrail: input safety
+    tool_hooks=[agno_hook(guard)],         # KIFF: action authority
+)
+```
 
-## What makes a cookbook recipe
+Recipes 5 and 6 demonstrate the two layers running side by side: Agno's
+`PIIDetectionGuardrail` (a `pre_hook`) scrubs a leaked SSN from the input,
+while KIFF (a `tool_hook`) blocks the action because the entity's state
+forbids it. Use what the framework gives you, **plus** KIFF.
 
-1. **Complete**: all source code, configs, build steps, and dependencies included
-2. **Runnable**: one command → everything ready → see the proof
-3. **Honest**: real models, real frameworks, real side effects (no mocks)
-4. **Reproducible**: anyone with the prerequisites can run it and see the same verdict
-5. **Verifiable**: the ledger/audit trail proves what happened
+## Adapters covered
 
-## Prerequisites (typical)
+Each recipe uses a different Python (or TS) adapter from `packages/`:
 
-- Go 1.23+ (for kiff-decide gate)
-- Node 22+ (for drivers, some systems-of-record)
-- Docker 25+ (for agent frameworks)
-- Model API key (OpenAI, Anthropic, etc.)
+| Adapter | Shape | Hook | Recipe(s) |
+|---------|-------|------|-----------|
+| OpenClaw (TS) | vote | `before_tool_call` | 1 |
+| LangGraph | middleware | `guard.evaluate()` inside `@tool` | 2 |
+| Agno | middleware | `tool_hooks=[agno_hook(guard)]` | 3, 5, 6 |
+| Strands | vote | `BeforeToolCallEvent` via `kiff_hook_provider` | 4 |
 
-## How to use a recipe
+Recipe 3 uses a single Agno agent; recipe 5 uses an Agno **Team**
+(multi-agent, one shared guard); recipe 6 uses an Agno **Workflow**
+(structured pipeline). Same adapter, three orchestration shapes — the guard
+is identical in all three.
+
+## KIFF Cloud runtimes (live proofs)
+
+| Recipe | Runtime ID | Adapter | Workflow |
+|--------|-----------|---------|----------|
+| refund-ceiling-guard | grt_7617bfedced8a04a | langgraph | refund-ceiling |
+| collections-promise-guard | grt_abf614d6f4bfba9c | agno | collections-promise |
+| chargeback-dispute-guard | grt_50a5e51abb54d5cb | strands | chargeback-dispute |
+| vulnerability-escalation-guard | grt_e21d38003d63d61e | agno | vulnerability-escalation |
+| kyb-verification-guard | grt_d66e423509953c46 | agno | kyb-verification |
+
+## Common structure
+
+Every recipe follows the same layout:
+
+```
+<recipe-name>/
+├── README.md       scenario, architecture, expected output
+├── PROOF.md        live proof record with actual terminal output
+├── MANIFEST.md     complete file inventory + reproducibility checklist
+├── .env.example    secrets template
+├── requirements.txt
+├── kiff-decide/    the KIFF gate (Go, wraps github.com/kiffhq/kiff v0.2.0)
+├── app/            system of record (deliberately non-idempotent)
+├── agent/          the real agent using the adapter
+└── driver/         proof script (WITHOUT vs WITH KIFF)
+```
+
+## How to run any recipe
 
 ```bash
 cd cookbook/<recipe-name>
-# 1. Read the README (scenario, architecture, what's proven)
-# 2. Set secrets in .env (from .env.example)
-# 3. Build: ./build.sh or follow the README steps
-# 4. Run: ./run.sh or node driver/scenario.mjs
-# 5. Verify: check the ledger, curl the state endpoint, read the logs
+cp .env.example .env && $EDITOR .env  # set OPENAI_API_KEY, KIFF_CLOUD_API_KEY
+
+# build the gate
+cd kiff-decide && go mod tidy && go build -o kiff-decide . && ./kiff-decide &
+
+# start the system of record
+python3 app/server.py &
+
+# install Python deps and run the proof
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cd driver && python3 scenario.py
 ```
-
-## Coming soon
-
-- **Insurance settlement audit** (the $10M court case: "show me the LLM's reasoning")
-- **Multi-agent coordination** (two agents, one resource, KIFF arbitrates)
-- **Approval-required actions** (high-risk transfers need human clearance)
-
-## Why cookbook recipes matter
-
-Agent frameworks give you tools, hooks, and guardrails. KIFF gives you a **state machine** that knows what's allowed *right now* based on what already happened. The cookbook proves the two work together to stop emergent risks that no single-call guardrail can catch.
 
 ## License
 

@@ -7,3 +7,7 @@ dist/
 .venv/
 .venv-*/
 *.tmp
+
+# Ephemeral deploy artifacts (keys, IPs, runner scripts) — never commit
+.tmp_*
+*.pem

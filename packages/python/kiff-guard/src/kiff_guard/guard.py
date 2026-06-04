@@ -137,6 +137,37 @@ class Guard:
         middleware path."""
         self._record_governed(tool, args, decision, executed=False)
 
+    def connect(
+        self,
+        adapter: str,
+        project: str = "",
+        environment: str = "",
+        workflow: str = "",
+        sdk_version: str = "",
+    ) -> Any:
+        """Opt into KIFF Cloud runtime discovery. Call this after creating
+        the guard to register this runtime in the dashboard. Separate from
+        observe/enforce so zero-config audit stays local unless the caller
+        explicitly connects.
+
+        Requires a client that implements GuardConnector (HTTPClient does).
+        Returns the GuardConnection from the cloud."""
+        from .client import GuardConnector
+
+        if self.client is None:
+            raise ValueError("connect requires a client")
+        if not hasattr(self.client, "connect_guard"):
+            raise ValueError("connect requires a client with connect_guard (HTTPClient)")
+        return self.client.connect_guard(  # type: ignore[union-attr]
+            agent_id=self.agent,
+            adapter=adapter,
+            mode=self.mode,
+            project=project,
+            environment=environment,
+            workflow=workflow,
+            sdk_version=sdk_version,
+        )
+
     # --- audit ---------------------------------------------------------
 
     def _record_observed(self, tool: str, args: Dict[str, Any]) -> None:
