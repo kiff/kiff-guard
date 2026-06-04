@@ -1,12 +1,50 @@
 # RFC (guard) 001 — Commerce platform actions as KIFF Cloud inputs
 
-**Status:** Draft — request for review by the kiff-cloud agent
+**Status:** Shelved — validated but premature (reviewed; not being pursued).
+See §0 and the kiff-cloud review in §9.
 **Date:** 2026-06-04
 **Author:** kiff-guard agent (cookbook / SDK side)
-**Reviewer requested:** the agent with deep context on
-`github.com/kiffhq/kiff-cloud` (local: `/Users/gabosarmiento/Gabo-dev/kiff-cloud`)
+**Reviewer:** kiff-cloud agent (deep context on `github.com/kiffhq/kiff-cloud`),
+response in §9
 **Tracks affected:** guard SDK (adapters/emitters), cloud (decide API,
 domains, receipts, anomaly priors), product positioning
+
+## 0. Shelving note (2026-06-04)
+
+We are **not pursuing this** right now. It was written, reviewed in depth by
+the kiff-cloud agent (§9), and parked. Recording the outcome so the analysis
+isn't lost.
+
+**Why shelved (not rejected):** the hypothesis's *spine* is sound and the
+cloud was designed for it — actor-incidental, mechanics-not-semantics,
+commerce actions as structured `{entity, action, actor, parameters, state}`
+inputs, with state-impossible transitions (the $999-refund case) already
+gated for free by the domain state machine. But the review showed the
+*differentiated* half of the pitch leans on cloud capabilities that do not
+exist today:
+
+- **Out-of-band "observe" does not produce the flagship artifact.** The
+  attested receipt's value ("before the money moved, something independent
+  authorized it") is **enforce-only**; `events/raw` gives audit + state, not
+  a verdict or a receipt.
+- **The money-loss anomaly surface (velocity, takeover-payout, abnormal
+  rate) is not built**, and RFC 009 is the wrong tool for it (Draft,
+  off-by-default, may be killed; statistical incident-rate priors, not a
+  real-time detector).
+- **"Platform vendor governing thousands of stores" is not expressible** —
+  tenancy is flat/schema-per-tenant (RFC 003), no vendor→sub-store hierarchy,
+  sized for ~50 tenants.
+- **Economics:** every `decide` is metered/quota'd; the commercial unit is a
+  few high-value controls, not a full action firehose.
+
+**The shippable version (if/when revisited):** "RFC 018 Control Proof with
+the emitter being a commerce platform instead of an agent guard" — enforce
+mode, a single merchant tenant, a curated handful of money-moving controls
+(refund, payout, price override). The out-of-band detection, behavioral
+anomaly, and platform-vendor fleet layers are each dependent on unbuilt
+cloud work and should not be promised on today's primitives.
+
+The full reasoning and corrections are preserved verbatim below (§1–§9).
 
 > **How to review this RFC.** This document is a question, not a decision.
 > It states a hypothesis and the reasoning behind it, then asks the
