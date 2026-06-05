@@ -68,7 +68,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..decision import Hold
 from ..guard import Guard
 
 
@@ -162,41 +161,21 @@ class GuardedAgentWorkflow:
 
                 tool = tools_by_name[ev.tool_name]
 
-                # --- KIFF gate -------------------------------------------
-                async def _run_tool() -> ToolOutput:
+                # --- KIFF gate (delegated to the SDK-independent core) ---
+                async def _run_tool() -> Any:
                     return await self._call_tool(ctx, tool, ev.tool_kwargs)
 
-                if _guard.mode == "observe":
-                    try:
-                        _guard.observe(ev.tool_name, ev.tool_kwargs)
-                    except Exception:
-                        pass  # observe never blocks
-                    result = await _run_tool()
-                else:
-                    # enforce
-                    try:
-                        decision = _guard.decide_only(ev.tool_name, ev.tool_kwargs)
-                    except Exception as exc:
-                        if _fail_closed:
-                            raise Hold(
-                                decision=type("_D", (), {
-                                    "outcome": "error",
-                                    "reason": f"KIFF guard unavailable (fail-closed): {exc}",
-                                    "withheld": True,
-                                })()
-                            ) from exc
-                        # fail-open: proceed without a recorded decision
-                        result = await _run_tool()
-                    else:
-                        if decision.withheld:
-                            _guard.record_withheld(
-                                ev.tool_name, ev.tool_kwargs, decision
-                            )
-                            raise Hold(decision=decision)
-                        _guard.record_executed(
-                            ev.tool_name, ev.tool_kwargs, decision
-                        )
-                        result = await _run_tool()
+                from kiff_guard.adapters.llama_index_core import (  # lazy
+                    run_guard_tool_call,
+                )
+
+                result = await run_guard_tool_call(
+                    _guard,
+                    ev.tool_name,
+                    ev.tool_kwargs,
+                    _run_tool,
+                    fail_closed=_fail_closed,
+                )
                 # ---------------------------------------------------------
 
                 result_ev = ToolCallResult(
