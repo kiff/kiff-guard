@@ -124,6 +124,21 @@ jobs:
       - run: pip install -e ".[dev,microsoft-agent-framework]"
       - run: python -m pytest tests/ -q -k "microsoft_agent_framework or conformance or guard_core"
 
+  adapter-llama-index:
+    name: adapter (llama-index @ latest)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # community/best-effort tier
+    defaults:
+      run:
+        working-directory: packages/python/kiff-guard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,llama-index]"
+      - run: python -m pytest tests/ -q -k "llama_index or conformance or guard_core"
+
   # TypeScript SDK (packages/js): typecheck + the vitest suite (guard
   # core, conformance, OpenClaw adapter). Mirrors the Python `test` job.
   js:

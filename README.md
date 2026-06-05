@@ -23,7 +23,7 @@ from a blank policy file.
 
 ```
 packages/
-  python/kiff-guard/   # the Python SDK (shipped): core + 9 adapters
+  python/kiff-guard/   # the Python SDK (shipped): core + 10 adapters
   js/                  # the TypeScript SDK (shipped): core + OpenClaw adapter
 ```
 
@@ -64,7 +64,7 @@ agent = Agent(model=..., tools=[...], tool_hooks=[agno_hook(guard)])
 | Haystack Agents | py | vote (`ConfirmationStrategy`) | shipped |
 | Microsoft Agent Framework | py | middleware (`FunctionMiddleware`, async) | shipped |
 | OpenClaw | **ts** | vote (`before_tool_call`) | shipped (`@kiffhq/kiff-guard/adapters/openclaw`; seam + contract verified) |
-| LlamaIndex | py | — | planned |
+| LlamaIndex | py | middleware (`GuardedAgentWorkflow` subclass, async) | shipped |
 
 Two integration shapes: **middleware** (the guard runs the tool via a
 handler continuation) and **vote / inverted-control** (the framework runs

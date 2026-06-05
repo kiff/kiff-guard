@@ -32,6 +32,7 @@ google-adk = ["google-adk"]
 strands = ["strands-agents"]
 haystack = ["haystack-ai"]
 microsoft-agent-framework = ["agent-framework-core"]
+llama-index = ["llama-index-core"]
 dev = ["pytest"]
 
 [project.urls]
