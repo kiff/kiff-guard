@@ -10,11 +10,21 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 authors = [{ name = "KIFF" }]
-keywords = ["kiff", "agents", "governance", "tool-calls", "audit", "guardrails"]
+keywords = ["kiff", "agents", "governance", "tool-calls", "audit", "guardrails", "llm", "ai-agents"]
 classifiers = [
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
 ]
 # Zero required runtime deps: the core speaks the KIFF HTTP API over the
 # stdlib (urllib), matching examples/refund-agno. Framework adapters add
@@ -41,3 +51,4 @@ Documentation = "https://docs.kiff.dev"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kiff_guard"]
+artifacts = ["src/kiff_guard/py.typed"]
