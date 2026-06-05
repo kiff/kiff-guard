@@ -1,0 +1,22 @@
+# CODEOWNERS — kiff-guard
+#
+# Protects the core SDK and conformance suite from changes that could
+# silently break the fail-safe, trust-boundary, or one-receipt invariants.
+# Adapters and cookbook recipes are community/best-effort; the core is not.
+
+# Core SDK — any change requires a review from the maintainers
+packages/python/kiff-guard/src/kiff_guard/guard.py        @kiffhq/maintainers
+packages/python/kiff-guard/src/kiff_guard/decision.py     @kiffhq/maintainers
+packages/python/kiff-guard/src/kiff_guard/client.py       @kiffhq/maintainers
+packages/python/kiff-guard/src/kiff_guard/conformance.py  @kiffhq/maintainers
+packages/python/kiff-guard/src/kiff_guard/catalog.py      @kiffhq/maintainers
+packages/python/kiff-guard/src/kiff_guard/__init__.py     @kiffhq/maintainers
+
+# TypeScript core
+packages/js/src/guard.ts       @kiffhq/maintainers
+packages/js/src/decision.ts    @kiffhq/maintainers
+packages/js/src/client.ts      @kiffhq/maintainers
+packages/js/src/conformance.test.ts @kiffhq/maintainers
+
+# CI and repo health
+.github/                       @kiffhq/maintainers
