@@ -34,15 +34,22 @@ dependencies = []
 [project.optional-dependencies]
 # Each adapter's host framework is optional — install only what you use.
 # The core never imports a framework; adapters import lazily.
-agno = ["agno"]
-langgraph = ["langgraph"]
-openai = ["openai-agents"]
-pydantic-ai = ["pydantic-ai"]
-google-adk = ["google-adk"]
-strands = ["strands-agents"]
-haystack = ["haystack-ai"]
-microsoft-agent-framework = ["agent-framework-core"]
-llama-index = ["llama-index-core"]
+#
+# Policy: AI agent frameworks move fast and break often, so we support
+# RECENT versions only — floor at a recent known-good minor, cap below the
+# next breaking unit (next major; next minor for 0.x frameworks, where
+# minors routinely break). CI runs each adapter against the framework's
+# *latest*, so upstream drift surfaces as a red badge, not a silent break.
+# Versions checked 2026-06-06.
+agno = ["agno>=2.6,<3"]                              # v2 was a full rewrite; hook sig stable across v2
+langgraph = ["langchain>=1.0,<2"]                    # wrap_tool_call is a LangChain v1 API (in `langchain`, not `langgraph`)
+openai = ["openai-agents>=0.17,<0.18"]               # seam verified against 0.17.4
+pydantic-ai = ["pydantic-ai>=1.0,<2"]
+google-adk = ["google-adk>=2.0,<3"]
+strands = ["strands-agents>=1.0,<2"]
+haystack = ["haystack-ai>=2.0,<3"]
+microsoft-agent-framework = ["agent-framework-core>=1.0,<2"]
+llama-index = ["llama-index-core>=0.14,<0.15"]       # AgentWorkflow.call_tool seam verified on the 0.14 line
 dev = ["pytest", "pyyaml"]
 
 [project.urls]

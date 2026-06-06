@@ -1,6 +1,10 @@
 """LangGraph / LangChain adapter — middleware (wrap_tool_call) shape.
 
-Verified against the current LangChain middleware API (2026):
+Verified against the LangChain v1 middleware API (2026): `wrap_tool_call`,
+`create_agent`, and the middleware types live in the **`langchain`**
+package (v1.x), not `langgraph` — `langchain` depends on `langgraph`
+underneath, but the imports below are satisfied by `langchain`. Install
+with `pip install "kiff-guard[langgraph]"`, which pulls `langchain>=1.0,<2`.
 
     from langchain.agents.middleware import wrap_tool_call
     from langchain.tools.tool_node import ToolCallRequest
@@ -24,7 +28,7 @@ machinery in the host app can still consume the ToolMessage outcome.
 
 This module imports LangChain lazily (only inside the factory / only when
 building a real ToolMessage), so importing kiff_guard never requires
-langchain. The `langgraph` extra pulls it in for real use.
+langchain. The `langgraph` extra pulls in `langchain` (v1) for real use.
 """
 
 from __future__ import annotations
