@@ -39,7 +39,7 @@ packages/
       adapters/             # one thin adapter per framework
     tests/                  # offline suite incl. conformance drivers
     pyproject.toml          # extras: one per adapter framework
-  js/                       # the TypeScript SDK (planned, kiff-guard-js)
+  js/                       # the TypeScript SDK (shipped): core + OpenClaw adapter
 ```
 
 Core logic belongs in `src/kiff_guard/`. Framework-specific glue belongs
@@ -165,6 +165,6 @@ against the PR author; if they match, fall back to `--comment`.
 Grow the verified Python adapter set (each gated on source-verification +
 conformance), keep the core thin and dependency-free, and keep the audit
 trail honest (observe = real record, not a governance verdict). The
-TypeScript SDK (`packages/js/`, `kiff-guard-js`) is the next language
-target; OpenClaw is its forcing function and is intentionally not a Python
-adapter.
+TypeScript SDK (`packages/js/`) is shipped with the OpenClaw adapter (a
+vote-shape adapter, intentionally not a Python adapter); grow its adapter
+set alongside Python's.

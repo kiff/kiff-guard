@@ -68,8 +68,8 @@ agent = Agent(model=..., tools=[...], tool_hooks=[agno_hook(guard)])
 
 Two integration shapes: **middleware** (the guard runs the tool via a
 handler continuation) and **vote / inverted-control** (the framework runs
-the tool; the hook only votes allow/block). Per-framework research and
-seam notes are in the cloud repo's `docs/integration/frameworks/`.
+the tool; the hook only votes allow/block). Each adapter documents its
+verified pre-tool-execution seam and block contract in its module docstring.
 
 ## Contributing an adapter
 

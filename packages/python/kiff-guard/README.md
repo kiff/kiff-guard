@@ -85,10 +85,10 @@ once; an adapter adds no governance logic of its own.
 | Haystack Agents | `kiff_guard.adapters.haystack` | shipped |
 | Microsoft Agent Framework | `kiff_guard.adapters.microsoft_agent_framework` | shipped |
 | LlamaIndex | `kiff_guard.adapters.llama_index` | shipped |
-| OpenClaw (TypeScript) | needs `kiff-guard-js` | planned |
+| OpenClaw (TypeScript) | `@kiffhq/kiff-guard/adapters/openclaw` (`packages/js`) | shipped |
 
-See the framework survey on kiffhq/kiff-cloud#239 for each one's seam,
-and `docs/integration/frameworks/` for per-framework research.
+Each adapter documents its verified pre-tool-execution seam and block
+contract in its module docstring. See the two adapter shapes below.
 
 ### Two adapter shapes
 
