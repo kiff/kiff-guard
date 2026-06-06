@@ -1,16 +1,15 @@
-# RFC (guard) 002 — IDE guard + decision copilot
+# RFC (guard) 002 — IDE guard (vote adapter on preToolUse)
 
 **Status:** Draft — design sketch, not yet scheduled
 **Date:** 2026-06-05
 **Author:** kiff-guard agent (SDK side)
-**Tracks affected:** guard SDK (a new IDE adapter), a separate optional
-explainer layer (NOT the guard)
+**Tracks affected:** guard SDK (a new IDE adapter)
 
-> **Scope discipline.** This RFC describes only kiff-guard's public surface
-> (an IDE adapter that votes on tool calls) and a *separate* advisory layer
-> that consumes the guard's verdict. It deliberately contains **no cloud
-> internals** (no tenancy/metering/RFC numbers/contract addresses). Keep it
-> that way.
+> **Scope discipline.** This RFC describes only kiff-guard's public surface:
+> an IDE adapter that votes on tool calls via a synchronous pre-tool hook.
+> The LLM-backed "decision copilot" is **out of scope** and lives in a
+> separate repo (see §3). No cloud internals (no tenancy/metering/RFC
+> numbers/contract addresses). Keep it that way.
 
 ---
 
@@ -18,19 +17,18 @@ explainer layer (NOT the guard)
 
 AI coding IDEs (Kiro, this IDE, Cursor, Claude Code, …) let a model propose
 and run tool calls — `fs_write`, `execute_bash`, `delete_file`, `git push`.
-Two real gaps for the human in the loop:
+The gap this RFC addresses:
 
-1. **No consistent, auditable verdict before you hit "play."** The IDE's
-   built-in allowlist is per-user, local, and stateless. There's no durable
-   record of what the agent actually did across sessions, and no shared
-   org-wide policy.
-2. **No impact explanation when the agent offers options.** When the agent
-   says "I can do A, B, or C," the user today copy-pastes the agent's reply
-   into Claude/ChatGPT to understand the tradeoffs and risks before
-   choosing. That loop is manual and invisible.
+**No consistent, auditable verdict before you hit "play."** The IDE's
+built-in allowlist is per-user, local, and stateless. There's no durable
+record of what the agent actually did across sessions, and no shared
+org-wide policy.
 
-These are **two different problems** and they want **two different layers**.
-Conflating them is the trap.
+(A second, related gap — explaining the impact of each option the agent
+offers, the copy-paste-to-Claude loop — is a *different problem* that wants
+a different, LLM-backed layer. It is **out of scope** for kiff-guard and
+lives in a separate repo. See §3. This RFC is the deterministic guard only;
+conflating the two is the trap.)
 
 ## 1. The two layers (and why they stay separate)
 
@@ -66,7 +64,7 @@ The copilot is strictly better *with* KIFF underneath: KIFF gives it
 record; the copilot gives the human the tradeoff narrative KIFF refuses to
 invent.
 
-## 2. Part A — the IDE guard (this is real KIFF work)
+## 2. The IDE guard (this is real KIFF work)
 
 ### 2.1 The seam
 
@@ -129,28 +127,18 @@ round-trip. Mitigation, and the recommended default: **gate only high-risk
 tools** (writes to protected paths, shell, git push) and let reads pass
 ungated. Observe mode adds no blocking latency at all.
 
-## 3. Part B — the decision copilot (separate, optional, LLM-backed)
+## 3. The decision copilot is out of scope (separate repo)
 
-NOT part of the guard. A separate component (could live in a different repo /
-package). Shape:
+The "explain each option's impact" idea is an **LLM-backed advisory layer**.
+It is explicitly **not kiff-guard** and does not belong in this repo: its
+engine is a model, and the moment an LLM lives near the guard the guard
+stops being the deterministic, weekend-readable thing that makes it
+trustworthy.
 
-```
-input:  the agent's proposed action(s) or options A/B/C
-        + KIFF's verdict + reason for each (from Part A)
-        + light repo context (diff, target paths)
-engine: an LLM prompt that explains each option's effect, reversibility,
-        blast radius, and recommends a default — grounded by KIFF's verdicts
-output: plain-language impact per option, shown inline in the IDE
-```
-
-Why grounding on KIFF matters: the copilot can *explain* why A is risky, but
-it must defer to KIFF on whether A is *allowed*. "Blocked" is not the
-copilot's opinion to override. This is what stops the explainer from
-confidently green-lighting something policy forbids.
-
-This is arguably the bigger product (it automates the copy-paste-to-Claude
-loop the user does today), but it's a **consumer** of the guard, not the
-guard. It should be designed and shipped on its own track.
+A separate project may *consume* the IDE guard's verdict as one grounding
+input (so it can't green-light something policy forbids), but it is designed
+and shipped on its own track, in its own repo. It is named here only to mark
+the boundary; this RFC does not specify it.
 
 ## 4. Where this is worth it / where it isn't
 
@@ -179,8 +167,8 @@ guard. It should be designed and shipped on its own track.
    shell, git push) once the policy is worth it.
 3. **Promote Route 1 to a real `adapters/kiro.py`** (Route 2) with
    conformance + tests + CI when it earns a place in the SDK.
-4. **Decision copilot** on its own track, consuming Part A's verdicts. Do
-   not put the LLM inside the guard.
+4. **Decision copilot** — out of scope for this repo (see §3). If built, it
+   lives in its own repo and consumes the guard's verdicts.
 
 ## 6. Open questions
 
