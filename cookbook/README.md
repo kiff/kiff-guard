@@ -6,6 +6,13 @@ Each recipe is a **complete, runnable proof**: real models, real agent framework
 real side effects, real KIFF runtime. Every recipe connects to KIFF Cloud so
 decisions and receipts are visible in the dashboard.
 
+## Start here: observe (no KIFF account)
+
+New to KIFF? Begin with **[observe-quickstart](./observe-quickstart/)** — it
+proves the observe-mode claim (audit trail + derived domain with **no KIFF
+account, no gate, no API call**) and runs offline with zero keys. It's the
+on-ramp before the enforce recipes below.
+
 ## Recipes
 
 | # | Recipe | Scenario | Adapter | Proof |
