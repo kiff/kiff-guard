@@ -168,6 +168,27 @@ class Guard:
             sdk_version=sdk_version,
         )
 
+    def save_draft(self, domain_name: str) -> Any:
+        """Save the domain draft derived from observed traffic to the KIFF
+        Cloud draft store, so it appears in the authoring UI. Renders the
+        learned catalog with export_yaml and PUTs it.
+
+        This is the credentialed half of instrument-first authoring; the
+        credential-less fallback is to call export_yaml yourself and paste
+        the result. Separate from observe/enforce so zero-config audit
+        stays local unless the caller explicitly saves.
+
+        Requires a client that implements DraftSaver (HTTPClient does).
+        Returns the DraftResult from the cloud."""
+        from .draft import export_yaml
+
+        if self.client is None:
+            raise ValueError("save_draft requires a client")
+        if not hasattr(self.client, "save_draft"):
+            raise ValueError("save_draft requires a client with save_draft (HTTPClient)")
+        yaml_text = export_yaml(domain_name, self.catalog)
+        return self.client.save_draft(yaml_text)  # type: ignore[union-attr]
+
     # --- audit ---------------------------------------------------------
 
     def _record_observed(self, tool: str, args: Dict[str, Any]) -> None:
