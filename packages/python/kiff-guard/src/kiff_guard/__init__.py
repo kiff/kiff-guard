@@ -21,7 +21,16 @@ Enforce (once you have a tenant + an active domain):
 from __future__ import annotations
 
 from .catalog import Catalog
-from .client import Client, GuardConnection, GuardConnector, HTTPClient, ToolBinding, ToolMap
+from .client import (
+    Client,
+    DraftResult,
+    DraftSaver,
+    GuardConnection,
+    GuardConnector,
+    HTTPClient,
+    ToolBinding,
+    ToolMap,
+)
 from .decision import Decision, Hold, Receipt
 from .draft import export_yaml
 from .guard import Guard
@@ -33,6 +42,8 @@ __all__ = [
     "Receipt",
     "Catalog",
     "Client",
+    "DraftResult",
+    "DraftSaver",
     "GuardConnection",
     "GuardConnector",
     "HTTPClient",

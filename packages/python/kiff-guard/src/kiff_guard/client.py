@@ -25,8 +25,8 @@ stdlib-only (urllib) — zero required runtime deps.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
@@ -53,6 +53,19 @@ class GuardConnection:
     seen_count: int = 0
 
 
+@dataclass
+class DraftResult:
+    """Returned by save_draft: the cloud's acknowledgement of the upserted
+    domain draft. `valid` is True when the cloud parsed the YAML cleanly
+    (a draft may be saved while still invalid mid-edit — `issues` lists the
+    problems in that case)."""
+
+    yaml: str
+    updated_at: int = 0
+    valid: bool = False
+    issues: List[str] = field(default_factory=list)
+
+
 class Client(Protocol):
     """What the guard needs from a decider. Implemented by HTTPClient;
     tests can pass any object with this method."""
@@ -75,6 +88,15 @@ class GuardConnector(Protocol):
         workflow: str = "",
         sdk_version: str = "",
     ) -> GuardConnection:
+        ...
+
+
+class DraftSaver(Protocol):
+    """Optional client capability for saving a derived domain draft to the
+    KIFF Cloud draft store (PUT /v1/me/domain/draft), so an observe-mode
+    draft shows up in the authoring UI. Implemented by HTTPClient."""
+
+    def save_draft(self, yaml_text: str) -> DraftResult:
         ...
 
 
@@ -210,6 +232,68 @@ class HTTPClient:
             last_seen_at=str(payload.get("last_seen_at", "")),
             seen_count=int(payload.get("seen_count", 0)),
         )
+
+    def save_draft(self, yaml_text: str) -> DraftResult:
+        """Upsert a derived domain draft to the cloud draft store
+        (PUT /v1/me/domain/draft). The tenant comes from the API key
+        server-side; the draft is identified by that tenant. The cloud
+        accepts the draft even if it is not yet valid (mid-edit), and
+        reports parse issues in the result.
+
+        Raises ConnectionError on transport failure or a non-2xx status,
+        consistent with connect_guard."""
+        if not yaml_text or not yaml_text.strip():
+            raise ValueError("save_draft requires non-empty YAML")
+
+        status, payload = self._put_yaml("/v1/me/domain/draft", yaml_text)
+        if status == 0:
+            message = payload.get("message", "transport error") if payload else "transport error"
+            raise ConnectionError(f"save draft failed: {message}")
+        if status < 200 or status >= 300:
+            message = payload.get("error", f"save draft returned status {status}") if payload else f"save draft returned status {status}"
+            raise ConnectionError(f"save draft failed: {message}")
+
+        issues_raw = payload.get("issues") or []
+        issues = [
+            i.get("message", str(i)) if isinstance(i, dict) else str(i)
+            for i in issues_raw
+        ]
+        return DraftResult(
+            yaml=str(payload.get("yaml", yaml_text)),
+            updated_at=int(payload.get("updated_at", 0) or 0),
+            valid=(payload.get("parsed") is not None and not issues),
+            issues=issues,
+        )
+
+    def _put_yaml(self, path: str, yaml_text: str) -> Tuple[int, Dict[str, Any]]:
+        url = self._base + path
+        data = yaml_text.encode("utf-8")
+        req = urllib_request.Request(
+            url,
+            data=data,
+            method="PUT",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/x-yaml",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib_request.urlopen(req, timeout=self._timeout) as resp:
+                status = resp.status
+                raw = resp.read().decode("utf-8")
+        except urllib_error.HTTPError as exc:
+            status = exc.code
+            raw = exc.read().decode("utf-8")
+        except urllib_error.URLError as exc:
+            return 0, {"message": f"transport error: {exc.reason}"}
+        payload: Dict[str, Any] = {}
+        if raw:
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                payload = {"raw": raw}
+        return status, payload
 
     def _post(self, path: str, body: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
         url = self._base + path

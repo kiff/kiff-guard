@@ -44,6 +44,21 @@ Observe never calls KIFF and never blocks a tool. You get a real audit
 trail of your own agent and a derived domain draft — the draft you then
 review and activate before turning on enforcement.
 
+With a Cloud credential you can push that derived draft straight to the
+authoring UI instead of pasting it:
+
+```python
+guard = Guard(client=HTTPClient(api_key="kiff_live_...", tool_map=ToolMap()),
+              tenant="<tenant>", agent="support", mode="observe")
+# ... run your agent ...
+result = guard.save_draft("my-domain")   # PUT /v1/me/domain/draft
+print(result.valid, result.issues)       # the draft now shows up in Studio
+```
+
+`save_draft` renders the learned catalog with `export_yaml` and upserts it
+to the cloud draft store. It's opt-in (separate from observe/enforce), so
+zero-config audit stays local unless you explicitly call it.
+
 ## Enforce — once you have a tenant and an active domain
 
 ```python
