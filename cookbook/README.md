@@ -13,6 +13,13 @@ proves the observe-mode claim (audit trail + derived domain with **no KIFF
 account, no gate, no API call**) and runs offline with zero keys. It's the
 on-ramp before the enforce recipes below.
 
+## Custom agent / non-SDK stack: govern over plain HTTP
+
+No adapter, no SDK? **[custom-agent-http](./custom-agent-http/)** shows that
+a proposal is one `POST /v1/proposals/decide` — runnable from shell or Go,
+with the fail-safe rule (run only on `allowed`). The on-ramp for Ruby, Go,
+shell, or any stack the Python/TS SDKs don't cover.
+
 ## Recipes
 
 | # | Recipe | Scenario | Adapter | Proof |
