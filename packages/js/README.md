@@ -41,6 +41,65 @@ const client = new HTTPClient({
 const guard = new Guard({ client, tenant: "<tenant>", agent: "support", mode: "enforce" });
 ```
 
+## Custom agent? No adapter required
+
+The adapter below is convenience glue for OpenClaw. It adds **no
+governance logic** — the guard logic lives in the core. If you run a
+custom agent (your own loop, a Deno/Node service, a framework with no
+adapter yet), use the core directly. `HTTPClient` already speaks the
+hosted decide route (`POST /v1/proposals/decide` against `api.kiff.dev`);
+there is nothing extra to install or run.
+
+**Observe — zero config, no KIFF account.** Call `observe` wherever your
+loop is about to run a tool:
+
+```ts
+import { Guard } from "@kiffhq/kiff-guard";
+
+const guard = new Guard({ mode: "observe" });   // no client, no tenant
+
+function runTool(name: string, args: Record<string, unknown>) {
+  guard.observe(name, args);                    // learn + record, never blocks
+  return tools[name](args);                     // your agent runs the tool
+}
+// ... after the run: guard.receipts each have state === "observed".
+```
+
+**Enforce — decide before you run.** Gate on `decision.withheld` (true for
+anything that isn't an explicit `allowed`, so an unknown future outcome
+fails safe), then record exactly one receipt:
+
+```ts
+import { Guard, HTTPClient, ToolMap } from "@kiffhq/kiff-guard";
+
+const client = new HTTPClient({
+  apiKey: "kiff_live_...",
+  toolMap: new ToolMap().bind("refund_order", "REFUND_ORDER", "Order", "order_id"),
+});
+const guard = new Guard({ client, tenant: "<tenant>", agent: "support", mode: "enforce" });
+
+async function runTool(name: string, args: Record<string, unknown>) {
+  const decision = await guard.decideOnly(name, args);   // calls KIFF, does not run
+  if (decision.withheld) {                                // != "allowed" → withhold
+    guard.recordWithheld(name, args, decision);
+    return `withheld: ${decision.outcome} — ${decision.reason}`;
+  }
+  const result = tools[name](args);                       // your agent runs the tool
+  guard.recordExecuted(name, args, decision);             // one receipt per call
+  return result;
+}
+```
+
+This is the same core the OpenClaw adapter calls; an adapter just
+translates one framework's pre-tool seam into these calls. You send
+`actorId` (the `agent`); you never send roles — the API key's roles govern
+authority server-side, so your only integration responsibility is
+authenticating the caller's identity, not granting it.
+
+For stacks neither SDK covers (Ruby, Go, shell), a proposal is a single
+HTTP POST — see
+[`cookbook/custom-agent-http`](../../cookbook/custom-agent-http/).
+
 ## Connect to KIFF Cloud
 
 Call `connect` when you want the hosted dashboard to show a live guard

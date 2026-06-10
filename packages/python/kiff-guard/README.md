@@ -81,6 +81,67 @@ decision so your app can route it to a human (approval_required) or
 surface the refusal. The API key's roles govern authority server-side —
 the guard never asserts roles, so it cannot weaken the trust boundary.
 
+## Custom agent? No adapter required
+
+The adapters below are convenience glue for specific frameworks. They add
+**no governance logic** — the guard logic lives in the core. If you run a
+custom agent (your own loop, a framework with no adapter yet, Deno,
+whatever), use the core directly. `HTTPClient` already speaks the hosted
+decide route (`POST /v1/proposals/decide` against `api.kiff.dev`); there
+is nothing extra to install or run.
+
+**Observe — zero config, no KIFF account.** Call `observe` wherever your
+loop is about to run a tool:
+
+```python
+from kiff_guard import Guard
+
+guard = Guard(mode="observe")            # no client, no tenant
+
+def run_tool(name, args):
+    guard.observe(name, args)            # learn + record, never blocks
+    return tools[name](**args)           # your agent runs the tool
+
+# ... after the run:
+for r in guard.receipts:
+    print(r.state, r.tool, r.outcome)    # state == "observed"
+```
+
+**Enforce — decide before you run.** Gate on `decision.withheld` (true for
+anything that isn't an explicit `allowed`, so an unknown future outcome
+fails safe), then record exactly one receipt:
+
+```python
+from kiff_guard import Guard, HTTPClient, ToolMap
+
+client = HTTPClient(
+    api_key="kiff_live_...",
+    tool_map=ToolMap().bind(
+        "refund_order", action="REFUND_ORDER",
+        entity_type="Order", entity_arg="order_id"),
+)
+guard = Guard(client=client, tenant="<tenant>", agent="support", mode="enforce")
+
+def run_tool(name, args):
+    decision = guard.decide_only(name, args)     # calls KIFF, does not run
+    if decision.withheld:                         # != "allowed" → withhold
+        guard.record_withheld(name, args, decision)
+        return f"withheld: {decision.outcome} — {decision.reason}"
+    result = tools[name](**args)                  # your agent runs the tool
+    guard.record_executed(name, args, decision)   # one receipt per call
+    return result
+```
+
+This is the same core the adapters call; an adapter just translates one
+framework's pre-tool seam into these calls. You send `actor_id` (the
+`agent`); you never send roles — the API key's roles govern authority
+server-side, so your only integration responsibility is authenticating the
+caller's identity, not granting it.
+
+For stacks the SDKs don't cover (Ruby, Go, shell), a proposal is a single
+HTTP POST — see
+[`cookbook/custom-agent-http`](../../../cookbook/custom-agent-http/).
+
 ## Architecture
 
 A **framework-agnostic core** (`Guard.evaluate`) plus **thin adapters**,

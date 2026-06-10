@@ -32,6 +32,16 @@ per agent framework, each translating that framework's pre-tool-execution
 seam into a single call to the core. The guard logic lives once; an
 adapter adds no governance logic of its own.
 
+> **Custom or no framework?** You don't need an adapter. The core (`Guard`
+> + `HTTPClient`) governs any tool call directly over plain HTTP — the
+> adapters are just convenience glue. See the "Custom agent? No adapter
+> required" quickstart in
+> [`packages/python`](./packages/python/kiff-guard/README.md#custom-agent-no-adapter-required)
+> or [`packages/js`](./packages/js/README.md#custom-agent-no-adapter-required),
+> and the raw-HTTP recipe in
+> [`cookbook/custom-agent-http`](./cookbook/custom-agent-http/) for stacks
+> the SDKs don't cover (Ruby, Go, shell).
+
 ## Python SDK
 
 See [`packages/python/kiff-guard/README.md`](./packages/python/kiff-guard/README.md)
