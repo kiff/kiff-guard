@@ -2,7 +2,7 @@
 
 **Date**: 2026-06-03
 **Instance**: EC2 t3.medium, us-east-1 (i-07e902e884c2124b8, 52.73.152.94)
-**Framework**: github.com/kiff/kiff v0.2.0
+**Framework**: github.com/kiffhq/kiff v0.2.0
 **Guard SDK**: kiff-guard Python v0.1.0
 **Agent framework**: Strands (BeforeToolCallEvent vote shape)
 **Model**: OpenAI gpt-4o-mini

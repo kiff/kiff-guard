@@ -13,13 +13,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kiff/kiff/pkg/kiff/action"
-	"github.com/kiff/kiff/pkg/kiff/actor"
-	"github.com/kiff/kiff/pkg/kiff/adapter"
-	"github.com/kiff/kiff/pkg/kiff/domain"
-	"github.com/kiff/kiff/pkg/kiff/event"
-	"github.com/kiff/kiff/pkg/kiff/permission"
-	"github.com/kiff/kiff/pkg/kiff/runtime"
+	"github.com/kiffhq/kiff/pkg/kiff/action"
+	"github.com/kiffhq/kiff/pkg/kiff/actor"
+	"github.com/kiffhq/kiff/pkg/kiff/adapter"
+	"github.com/kiffhq/kiff/pkg/kiff/domain"
+	"github.com/kiffhq/kiff/pkg/kiff/event"
+	"github.com/kiffhq/kiff/pkg/kiff/permission"
+	"github.com/kiffhq/kiff/pkg/kiff/runtime"
 )
 
 const (

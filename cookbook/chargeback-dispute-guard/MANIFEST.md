@@ -24,6 +24,6 @@ cd driver && python3 scenario.py
 ```
 
 ## External dependencies
-- `github.com/kiff/kiff v0.2.0`
+- `github.com/kiffhq/kiff v0.2.0`
 - `strands-agents`, `strands-agents-tools`, `openai`
 - kiff-guard Python SDK + strands adapter

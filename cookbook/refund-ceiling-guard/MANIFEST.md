@@ -13,7 +13,7 @@ refund-ceiling-guard/
 ├── kiff-decide/                  # Service 1: the KIFF gate (Go)
 │   ├── main.go                   # HTTP server: decide, ingest, seed, state
 │   ├── domain.go                 # Order domain: PAID→PARTIALLY_REFUNDED→FULLY_REFUNDED
-│   └── go.mod                    # Depends on github.com/kiff/kiff v0.2.0
+│   └── go.mod                    # Depends on github.com/kiffhq/kiff v0.2.0
 │
 ├── app/
 │   └── server.py                 # Service 2: system of record (stdlib only)
@@ -55,7 +55,7 @@ cd driver && python3 scenario.py
 ## External dependencies
 
 ### Go
-- `github.com/kiff/kiff v0.2.0`
+- `github.com/kiffhq/kiff v0.2.0`
 
 ### Python
 - `langchain>=0.3.0`, `langchain-openai>=0.3.0`, `langgraph>=0.4.0`
