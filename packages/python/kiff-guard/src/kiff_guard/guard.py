@@ -189,6 +189,75 @@ class Guard:
         yaml_text = export_yaml(domain_name, self.catalog)
         return self.client.save_draft(yaml_text)  # type: ignore[union-attr]
 
+    def observe_push(
+        self,
+        adapter: str,
+        project: str = "",
+        environment: str = "",
+        workflow: str = "",
+        sdk_version: str = "",
+    ) -> Any:
+        """Push the observed tool catalog to KIFF Cloud so it can derive a
+        candidate domain from real traffic (POST /v1/guard/observations).
+        Parallel to connect() / save_draft(): separate from observe/enforce
+        so zero-config audit stays local unless the caller explicitly pushes.
+
+        Turns the learned Catalog + the client's ToolMap bindings into tool
+        observations. It only reports what is genuinely known:
+
+          - name                — the observed tool.
+          - parameter_schema    — the argument keys seen in real calls, as
+                                  object properties (no invented types).
+          - action/entity_type/entity_arg — from the ToolMap binding, when
+                                  the tool is bound (real configuration).
+          - observed_call_count — the real number of observed calls.
+
+        It deliberately does NOT set `required`, a risk level, a state, or
+        any threshold: those are human judgment, never inferred from
+        traffic. Unbound/unmapped tools are still reported (name + observed
+        args), carrying no action binding.
+
+        Requires a client that implements ObservationPusher (HTTPClient does).
+        Returns the GuardObservation echoed by the cloud."""
+        from .client import GuardToolObservation
+
+        if self.client is None:
+            raise ValueError("observe_push requires a client")
+        if not hasattr(self.client, "observe_guard"):
+            raise ValueError("observe_push requires a client with observe_guard (HTTPClient)")
+
+        tool_map = getattr(self.client, "tool_map", None)
+        tools: List[GuardToolObservation] = []
+        for name in sorted(self.catalog.tools):
+            arg_keys = sorted(self.catalog.tools[name])
+            binding = tool_map.get(name) if tool_map is not None else None
+            count = self.catalog.counts.get(name, 0)
+            tools.append(
+                GuardToolObservation(
+                    name=name,
+                    parameter_schema=(
+                        {"type": "object", "properties": {k: {} for k in arg_keys}}
+                        if arg_keys
+                        else None
+                    ),
+                    entity_arg=(binding.entity_arg if binding else None),
+                    action=(binding.action if binding else None),
+                    entity_type=(binding.entity_type if binding else None),
+                    observed_call_count=(count if count else None),
+                )
+            )
+
+        return self.client.observe_guard(  # type: ignore[union-attr]
+            agent_id=self.agent,
+            adapter=adapter,
+            mode=self.mode,
+            tools=tools,
+            project=project,
+            environment=environment,
+            workflow=workflow,
+            sdk_version=sdk_version,
+        )
+
     # --- audit ---------------------------------------------------------
 
     def _record_observed(self, tool: str, args: Dict[str, Any]) -> None:

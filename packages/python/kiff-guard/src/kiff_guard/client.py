@@ -66,6 +66,50 @@ class DraftResult:
     issues: List[str] = field(default_factory=list)
 
 
+@dataclass
+class GuardToolObservation:
+    """One observed tool, as pushed to KIFF Cloud (POST /v1/guard/observations).
+
+    Mirrors the JS SDK's GuardToolObservation. Every field except `name` is
+    optional and is omitted from the wire body when unset, so the push only
+    ever carries what is genuinely known:
+
+      name                — the tool's function name (observed).
+      parameter_schema    — a JSON-schema-ish object of the argument keys
+                            seen in real calls (no invented types/required).
+      entity_arg/action/entity_type — the ToolMap binding, when the tool is
+                            bound (real configuration, not inferred).
+      required            — left unset by the catalog-derived path: which
+                            args are required is human judgment, not observed.
+      observed_call_count — how many times the tool was actually called.
+    """
+
+    name: str
+    description: Optional[str] = None
+    parameter_schema: Optional[Dict[str, Any]] = None
+    entity_arg: Optional[str] = None
+    action: Optional[str] = None
+    entity_type: Optional[str] = None
+    required: Optional[List[str]] = None
+    observed_call_count: Optional[int] = None
+
+
+@dataclass
+class GuardObservation:
+    """Returned by observe_guard: the cloud's stored observation for this
+    tenant/project/environment/agent/workflow, echoing the tools it now
+    knows about."""
+
+    project: str = ""
+    environment: str = ""
+    agent_id: str = ""
+    workflow: str = ""
+    tools: List[GuardToolObservation] = field(default_factory=list)
+    tenant_id: str = ""
+    observed_at: str = ""
+    updated_at: str = ""
+
+
 class Client(Protocol):
     """What the guard needs from a decider. Implemented by HTTPClient;
     tests can pass any object with this method."""
@@ -97,6 +141,26 @@ class DraftSaver(Protocol):
     draft shows up in the authoring UI. Implemented by HTTPClient."""
 
     def save_draft(self, yaml_text: str) -> DraftResult:
+        ...
+
+
+class ObservationPusher(Protocol):
+    """Optional client capability for pushing the observed tool catalog to
+    KIFF Cloud (POST /v1/guard/observations), so the cloud can derive a
+    candidate domain from real traffic. Mirrors the JS SDK's observeGuard.
+    Implemented by HTTPClient."""
+
+    def observe_guard(
+        self,
+        agent_id: str,
+        adapter: str,
+        mode: str,
+        tools: List["GuardToolObservation"],
+        project: str = "",
+        environment: str = "",
+        workflow: str = "",
+        sdk_version: str = "",
+    ) -> GuardObservation:
         ...
 
 
@@ -147,6 +211,14 @@ class HTTPClient:
         self._tool_map = tool_map
         self._base = base_url.rstrip("/")
         self._timeout = timeout
+
+    @property
+    def tool_map(self) -> ToolMap:
+        """The ToolMap this client decides against. Exposed (read-only) so
+        Guard.observe_push can enrich observed tools with their bindings
+        (action/entity_type/entity_arg) — the bindings live on the client
+        because the client is what speaks decide."""
+        return self._tool_map
 
     def decide(self, tenant: str, agent: str, tool: str, args: Dict[str, Any]) -> Decision:
         binding = self._tool_map.get(tool)
@@ -232,6 +304,59 @@ class HTTPClient:
             last_seen_at=str(payload.get("last_seen_at", "")),
             seen_count=int(payload.get("seen_count", 0)),
         )
+
+    def observe_guard(
+        self,
+        agent_id: str,
+        adapter: str,
+        mode: str,
+        tools: List[GuardToolObservation],
+        project: str = "",
+        environment: str = "",
+        workflow: str = "",
+        sdk_version: str = "",
+    ) -> GuardObservation:
+        """Push the observed tool catalog to KIFF Cloud
+        (POST /v1/guard/observations). The cloud stores the observation and
+        derives a candidate domain from it (action/entity bindings + the
+        argument shapes seen). Call after the runtime has observed real
+        tool traffic. Mirrors the JS SDK's observeGuard.
+
+        Raises ConnectionError on transport failure or a non-2xx status,
+        consistent with connect_guard / save_draft."""
+        if not agent_id:
+            raise ValueError("agent_id is required")
+        if not adapter:
+            raise ValueError("adapter is required")
+
+        body: Dict[str, Any] = {
+            "agent_id": agent_id,
+            "adapter": adapter,
+            "mode": mode,
+            "tools": [_wire_tool_observation(t) for t in tools],
+        }
+        if project:
+            body["project"] = project
+        if environment:
+            body["environment"] = environment
+        if workflow:
+            body["workflow"] = workflow
+        if sdk_version:
+            body["sdk_version"] = sdk_version
+
+        status, payload = self._post("/v1/guard/observations", body)
+        if status == 0:
+            message = payload.get("message", "transport error") if payload else "transport error"
+            raise ConnectionError(f"guard observe failed: {message}")
+        if status < 200 or status >= 300:
+            message = (
+                payload.get("error", f"observations returned status {status}")
+                if payload
+                else f"observations returned status {status}"
+            )
+            raise ConnectionError(f"guard observe failed: {message}")
+
+        return _observation_from_payload(payload.get("observation", payload) if payload else {})
 
     def save_draft(self, yaml_text: str) -> DraftResult:
         """Upsert a derived domain draft to the cloud draft store
@@ -324,3 +449,57 @@ class HTTPClient:
             except json.JSONDecodeError:
                 payload = {"raw": raw}
         return status, payload
+
+
+def _wire_tool_observation(tool: GuardToolObservation) -> Dict[str, Any]:
+    """Render one GuardToolObservation to the wire shape, omitting unset
+    fields so the push carries only what is known (parity with the JS
+    SDK's wireToolObservation)."""
+    body: Dict[str, Any] = {"name": tool.name}
+    if tool.description:
+        body["description"] = tool.description
+    if tool.parameter_schema is not None:
+        body["parameter_schema"] = tool.parameter_schema
+    if tool.entity_arg:
+        body["entity_arg"] = tool.entity_arg
+    if tool.action:
+        body["action"] = tool.action
+    if tool.entity_type:
+        body["entity_type"] = tool.entity_type
+    if tool.required is not None:
+        body["required"] = tool.required
+    if tool.observed_call_count is not None:
+        body["observed_call_count"] = tool.observed_call_count
+    return body
+
+
+def _observation_from_payload(payload: Dict[str, Any]) -> GuardObservation:
+    """Parse the cloud's observation response back into a GuardObservation."""
+    tools_raw = payload.get("tools") or []
+    tools: List[GuardToolObservation] = []
+    for t in tools_raw:
+        if not isinstance(t, dict):
+            continue
+        required = t.get("required")
+        tools.append(
+            GuardToolObservation(
+                name=str(t.get("name", "")),
+                description=(str(t["description"]) if t.get("description") else None),
+                parameter_schema=(t["parameter_schema"] if isinstance(t.get("parameter_schema"), dict) else None),
+                entity_arg=(str(t["entity_arg"]) if t.get("entity_arg") else None),
+                action=(str(t["action"]) if t.get("action") else None),
+                entity_type=(str(t["entity_type"]) if t.get("entity_type") else None),
+                required=([str(x) for x in required] if isinstance(required, list) else None),
+                observed_call_count=(int(t["observed_call_count"]) if t.get("observed_call_count") is not None else None),
+            )
+        )
+    return GuardObservation(
+        project=str(payload.get("project", "")),
+        environment=str(payload.get("environment", "")),
+        agent_id=str(payload.get("agent_id", "")),
+        workflow=str(payload.get("workflow", "")),
+        tools=tools,
+        tenant_id=str(payload.get("tenant_id", "")),
+        observed_at=str(payload.get("observed_at", "")),
+        updated_at=str(payload.get("updated_at", "")),
+    )
