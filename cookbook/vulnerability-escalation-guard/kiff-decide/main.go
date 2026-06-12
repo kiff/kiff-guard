@@ -17,9 +17,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kiffhq/kiff/pkg/kiff/action"
-	"github.com/kiffhq/kiff/pkg/kiff/proposal"
-	"github.com/kiffhq/kiff/pkg/kiff/runtime"
+	"github.com/kiff/kiff/pkg/kiff/action"
+	"github.com/kiff/kiff/pkg/kiff/proposal"
+	"github.com/kiff/kiff/pkg/kiff/runtime"
 )
 
 type server struct{ rt *runtime.Runtime }
