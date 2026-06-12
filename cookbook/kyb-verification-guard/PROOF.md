@@ -2,7 +2,7 @@
 
 **Date**: 2026-06-04
 **Instance**: EC2 t3.large, us-east-1d (i-008692d750b341a67, 13.221.5.207)
-**Framework**: github.com/kiff/kiff v0.2.0 (public, MIT)
+**Framework**: github.com/kiffhq/kiff v0.2.0 (public, MIT)
 **Guard SDK**: kiff-guard Python v0.1.0 (MIT)
 **Agent framework**: Agno 2.6.11 — **Workflows** (agno_hook middleware shape)
 **Model**: OpenAI gpt-4o-mini

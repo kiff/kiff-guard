@@ -13,7 +13,7 @@ collections-promise-guard/
 ├── kiff-decide/                     # Service 1: the KIFF gate (Go)
 │   ├── main.go                      # HTTP server: decide, ingest, seed, state
 │   ├── domain.go                    # Collections domain: DELINQUENT→PROMISE_ACTIVE→FULFILLED|BROKEN
-│   └── go.mod                       # Depends on github.com/kiff/kiff v0.2.0
+│   └── go.mod                       # Depends on github.com/kiffhq/kiff v0.2.0
 │
 ├── app/
 │   └── server.py                    # Service 2: system of record (stdlib only)
@@ -56,7 +56,7 @@ COLLECTIONS_APP_URL=http://localhost:8082
 ## External dependencies
 
 ### Go (kiff-decide)
-- `github.com/kiff/kiff v0.2.0` (public framework, MIT)
+- `github.com/kiffhq/kiff v0.2.0` (public framework, MIT)
 
 ### Python (agent)
 - `agno>=1.4.0` — agent framework with `tool_hooks` middleware

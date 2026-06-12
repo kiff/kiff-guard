@@ -97,7 +97,7 @@ Every recipe follows the same layout:
 ├── MANIFEST.md     complete file inventory + reproducibility checklist
 ├── .env.example    secrets template
 ├── requirements.txt
-├── kiff-decide/    the KIFF gate (Go, wraps github.com/kiff/kiff v0.2.0)
+├── kiff-decide/    the KIFF gate (Go, wraps github.com/kiffhq/kiff v0.2.0)
 ├── app/            system of record (deliberately non-idempotent)
 ├── agent/          the real agent using the adapter
 └── driver/         proof script (WITHOUT vs WITH KIFF)
