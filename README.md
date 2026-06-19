@@ -13,7 +13,8 @@ The same one-line integration that governs your agent at runtime also
 **derives a starter KIFF domain** from real traffic — so you never start
 from a blank policy file.
 
-> Part of [KIFF](https://kiff.dev) — air traffic control for AI agents.
+> Part of [KIFF](https://kiff.dev) — the open-source operational foundation
+> for agentic systems. Build the domain once, then connect any agent.
 > This repo is the **client SDK + framework adapters**, MIT-licensed and
 > community-maintainable. The framework lives at
 > [`kiff/kiff`](https://github.com/kiff/kiff); the hosted runtime is
