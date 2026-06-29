@@ -51,12 +51,21 @@ def make_model():
     """
     provider = os.environ.get("MODEL_PROVIDER", "openai").lower()
     model_id = os.environ.get("MODEL_ID", "").strip()
+    region = os.environ.get("AWS_REGION", "us-east-1")
     if provider == "bedrock":
+        import boto3
         from agno.models.aws import AwsBedrock
-        return AwsBedrock(id=model_id or "amazon.nova-pro-v1:0")
+        # Pass an explicit boto3 Session so the full credential chain is used
+        # (env, shared profile, and the instance role via IMDS, which carries a
+        # session token). Agno's AwsBedrock otherwise reads only static
+        # AWS_ACCESS_KEY_ID/SECRET env vars and ignores the session token.
+        return AwsBedrock(id=model_id or "amazon.nova-pro-v1:0",
+                          session=boto3.Session(region_name=region))
     if provider in ("claude", "bedrock-claude"):
+        import boto3
         from agno.models.aws import Claude
-        return Claude(id=model_id or "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
+        return Claude(id=model_id or "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                      session=boto3.Session(region_name=region))
     from agno.models.openai import OpenAIChat
     return OpenAIChat(id=model_id or "gpt-4o-mini")
 
