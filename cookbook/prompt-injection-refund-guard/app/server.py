@@ -15,6 +15,7 @@ fallback credit) it should never have; WITH KIFF those calls are refused at
 the boundary because the order is already REFUNDED.
 """
 import json
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Lock
 
@@ -119,6 +120,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = 8082
+    port = int(os.environ.get("APP_PORT", "8082"))
     print(f"order-app listening on :{port}")
     HTTPServer(("", port), Handler).serve_forever()
