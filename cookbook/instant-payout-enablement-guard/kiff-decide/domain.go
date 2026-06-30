@@ -29,8 +29,8 @@ const (
 	AdapterEscrow = "escrow"
 	EntityEscrow  = "Escrow"
 
-	EventEscrowCreated  = "ESCROW_CREATED"
-	EventEscrowCleared  = "ESCROW_CLEARED"
+	EventEscrowCreated   = "ESCROW_CREATED"
+	EventEscrowCleared   = "ESCROW_CLEARED"
 	EventPayoutDisbursed = "PAYOUT_DISBURSED"
 
 	StateCreated   = "CREATED"

@@ -1,11 +1,12 @@
 // Command kiff-decide — instant-payout-enablement-guard gate server.
 //
 // Routes:
-//   POST /v1/proposals/decide
-//   POST /v1/events/raw       advance escrow state (ESCROW_CLEARED, PAYOUT_DISBURSED)
-//   POST /seed                seed an escrow into CREATED
-//   GET  /v1/entities/{id}/state
-//   GET  /healthz
+//
+//	POST /v1/proposals/decide
+//	POST /v1/events/raw       advance escrow state (ESCROW_CLEARED, PAYOUT_DISBURSED)
+//	POST /seed                seed an escrow into CREATED
+//	GET  /v1/entities/{id}/state
+//	GET  /healthz
 package main
 
 import (
