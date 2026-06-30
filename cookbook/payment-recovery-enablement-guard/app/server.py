@@ -13,6 +13,7 @@ run shows the boundary letting the legitimate recovery charge through and
 declining the repeats.
 """
 import json
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Lock
 
@@ -115,6 +116,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = 8082
+    port = int(os.environ.get("APP_PORT", "8082"))
     print(f"payment-app listening on :{port}")
     HTTPServer(("", port), Handler).serve_forever()
