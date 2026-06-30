@@ -141,6 +141,22 @@ Recipes 5 and 6 also show **framework guardrails PLUS KIFF**: Agno's
 `tool_hook`, action authority) running side by side — different layers,
 not competitors.
 
+### Enablement recipes
+
+A second family with the opposite framing: instead of leading with the block,
+the agent *does the work* — a real Agno agent performs the legitimate
+revenue/ops action (KIFF allows it, state advances), then is declined on every
+repeat once state moves on. The boundary is what makes putting the agent on the
+task shippable. E2–E5 run on `kiff/kiff v0.6.0` (policy-owned roles) + Agno v2.
+
+| # | Recipe | Adapter | Verdict |
+|---|--------|---------|---------|
+| E1 | [refund-enablement-guard](./cookbook/refund-enablement-guard/) | Agno | refund issued, 4 repeats declined |
+| E2 | [deal-close-enablement-guard](./cookbook/deal-close-enablement-guard/) | Agno | 1 discount, 4 declined (no stacking) |
+| E3 | [payment-recovery-enablement-guard](./cookbook/payment-recovery-enablement-guard/) | Agno | 1 charge recovered, 4 declined |
+| E4 | [instant-payout-enablement-guard](./cookbook/instant-payout-enablement-guard/) | Agno | 1 payout, 4 declined (one-per-escrow) |
+| E5 | [prompt-injection-refund-guard](./cookbook/prompt-injection-refund-guard/) | Agno | adversarial: 0 extra payouts, 2/2 money paths declined |
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
