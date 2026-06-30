@@ -126,10 +126,10 @@ Every recipe follows the same layout:
 └── driver/         proof script (WITHOUT vs WITH KIFF)
 ```
 
-Every recipe carries its own `README.md` and `PROOF.md`. The enforce recipes
-(1–6) also include `MANIFEST.md`; the enablement recipes (E1–E5) keep the same
-`README.md` + `PROOF.md` convention and, for E2–E5, build on the migrated
-`github.com/kiff/kiff v0.6.0` gate (policy-owned roles via `AssignRole`).
+Every recipe carries its own `README.md`, `PROOF.md`, and `MANIFEST.md`. The
+enablement recipes (E1–E5) follow the same convention and, for E2–E5, build on
+the migrated `github.com/kiff/kiff v0.6.0` gate (policy-owned roles via
+`AssignRole`).
 
 ## How to run any recipe
 
