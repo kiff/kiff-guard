@@ -1,6 +1,10 @@
 # kiff-guard
 
-**Drop-in KIFF clearance for any agent's tool calls.** One guard, two modes:
+**Connect an existing agent to KIFF.** `kiff-guard` is the client SDK +
+adapter layer for teams that already have agents and want their real tool calls
+to pass through KIFF before consequential side effects run.
+
+One guard, two modes:
 
 - **observe** — runs every tool, records an audit trail, and learns the
   action catalog. No KIFF account, no domain, no API call required. The
@@ -19,6 +23,29 @@ from a blank policy file.
 > community-maintainable. The framework lives at
 > [`kiff/kiff`](https://github.com/kiff/kiff); the hosted runtime is
 > KIFF Cloud.
+
+## Connect path
+
+Connect starts from the agent you already run:
+
+1. **Attach an adapter** to the framework's pre-tool-execution seam, or wrap a
+   plain function call with the core `Guard`.
+2. **Observe** real tool calls without a KIFF account or domain. The agent still
+   runs; the guard records what tools are being called and learns the action
+   catalog.
+3. **Derive** starter KIFF domain material from that traffic: candidate actions,
+   entity hints, required parameters, and the runtime/source evidence they came
+   from.
+4. **Enforce** by pointing the same guard at a KIFF runtime. Every tool call asks
+   for a decision first: `allowed` runs, anything else withholds.
+
+The framework repo (`kiff/kiff`) owns the domain/runtime kernel. This repo owns
+the connection layer: SDK primitives, framework adapters, observe/enforce
+wrappers, runtime registration, and source attribution.
+
+Tracking: cloud Connect epic
+[`kiff/kiff-cloud#542`](https://github.com/kiff/kiff-cloud/issues/542);
+source-attribution follow-up [#42](https://github.com/kiff/kiff-guard/issues/42).
 
 ## Repository layout
 
@@ -76,6 +103,7 @@ agent = Agent(model=..., tools=[...], tool_hooks=[agno_hook(guard)])
 | Microsoft Agent Framework | py | middleware (`FunctionMiddleware`, async) | shipped |
 | OpenClaw | **ts** | vote (`before_tool_call`) | shipped (`@kiff/kiff-guard/adapters/openclaw`; seam + contract verified) |
 | LlamaIndex | py | middleware (`GuardedAgentWorkflow` subclass, async) | shipped |
+| Custom / no framework | any | core `Guard` + `HTTPClient` / raw HTTP | shipped |
 
 Two integration shapes: **middleware** (the guard runs the tool via a
 handler continuation) and **vote / inverted-control** (the framework runs
