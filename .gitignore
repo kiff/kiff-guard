@@ -8,6 +8,12 @@ dist/
 .venv-*/
 *.tmp
 
+# macOS Finder metadata. A bare pattern matches at any depth, so this covers
+# nested directories too. The root .DS_Store was tracked until now; it was
+# removed from the index with `git rm --cached`, which leaves the local file
+# in place and only stops git following it.
+.DS_Store
+
 # Ephemeral deploy artifacts (keys, IPs, runner scripts) — never commit
 .tmp_*
 *.pem
