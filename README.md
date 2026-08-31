@@ -110,6 +110,24 @@ handler continuation) and **vote / inverted-control** (the framework runs
 the tool; the hook only votes allow/block). Each adapter documents its
 verified pre-tool-execution seam and block contract in its module docstring.
 
+## Compatibility
+
+Both SDKs share a version number and are released from the same tag.
+Semantic versioning applies to the **core**: `Guard`, `HTTPClient`,
+`ToolMap`, and the decision shape. Those are what your code imports and
+what a major version protects.
+
+**Adapters are scoped out of that promise.** An adapter is glue over
+another project's interception seam, and agent frameworks change those
+seams on their own schedule — sometimes in a patch. When an upstream
+framework moves its hook, the adapter follows it in a minor release rather
+than forcing a major version for a break we did not introduce. Each adapter
+pins the framework range it is tested against, and CI runs it against that
+framework's latest so drift surfaces as a red badge.
+
+In practice: pin the SDK normally, and treat an adapter's framework range
+as the real compatibility contract for that framework.
+
 ## Contributing an adapter
 
 Every adapter must pass the **conformance suite**

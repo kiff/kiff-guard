@@ -49,4 +49,8 @@ export {
 export { Guard, type GuardConnectOptions, type GuardMode, type GuardOptions } from "./guard.js";
 export { exportYaml } from "./draft.js";
 
-export const VERSION = "0.1.0";
+// Sent to KIFF on every decide call as sdkVersion. Node has no reliable
+// runtime read of package.json across ESM, CJS, and bundlers, so this stays
+// a literal — and version.test.ts asserts it equals package.json, so the two
+// cannot drift without turning CI red.
+export const VERSION = "1.0.0";

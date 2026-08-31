@@ -4,17 +4,23 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kiff-guard"
-version = "0.1.0"
+version = "1.0.0"
 description = "Drop-in guard that puts KIFF clearance in front of any agent's tool calls — observe to audit, enforce to govern."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "KIFF" }]
 keywords = ["kiff", "agents", "governance", "tool-calls", "audit", "guardrails", "llm", "ai-agents"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  # 1.0 promises a stable core API (Guard / HTTPClient / ToolMap and the
+  # decision shape). See "Compatibility" in README.md for why adapters are
+  # scoped out of that promise.
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
+  # No "License ::" classifier on purpose: PEP 639 forbids pairing a license
+  # expression (license = "MIT" above) with legacy license classifiers, and
+  # newer build backends error on the combination.
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
@@ -55,6 +61,9 @@ dev = ["pytest", "pyyaml"]
 [project.urls]
 Homepage = "https://kiff.dev"
 Documentation = "https://docs.kiff.dev"
+Source = "https://github.com/kiff/kiff-guard"
+Changelog = "https://github.com/kiff/kiff-guard/blob/main/CHANGELOG.md"
+Issues = "https://github.com/kiff/kiff-guard/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kiff_guard"]

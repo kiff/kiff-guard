@@ -1,0 +1,130 @@
+name: release
+
+# Tag-triggered publish of both guard SDKs.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# The tag is the only trigger. Nothing publishes on a branch push, so a
+# merge to main is always safe.
+#
+# Credentials:
+#   PyPI  — Trusted Publishing (OIDC). No token exists. The `pypi`
+#           environment below must match the pending publisher configured
+#           at pypi.org (project kiff-guard, owner kiff, repo kiff-guard,
+#           workflow release.yml, environment pypi).
+#   npm   — NPM_TOKEN repository secret, granular, scoped to @kiff.
+#           `id-token: write` is what enables --provenance; provenance and
+#           trusted publishing are independent features, so the attestation
+#           works with token auth. Once @kiff/kiff-guard exists, npm's
+#           trusted publishing can replace the token and it can be deleted.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate both publishes behind one job. A version that disagrees with its
+  # tag is unrecoverable once published — neither PyPI nor npm lets a
+  # version number be reused — so it is checked before anything ships.
+  verify:
+    name: verify tag and tests
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        id: tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag $GITHUB_REF_NAME -> version $version"
+
+      - name: Tag must match both package versions
+        run: |
+          expected="${{ steps.tag.outputs.version }}"
+          py=$(grep -m1 '^version = ' packages/python/kiff-guard/pyproject.toml | cut -d'"' -f2)
+          js=$(node -p "require('./packages/js/package.json').version")
+          echo "tag=$expected pyproject=$py package.json=$js"
+          if [ "$py" != "$expected" ] || [ "$js" != "$expected" ]; then
+            echo "::error::version mismatch — bump both packages to $expected before tagging"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python core + conformance suite
+        working-directory: packages/python/kiff-guard
+        run: |
+          pip install -e ".[dev]"
+          python -m pytest tests/ -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: TypeScript build + tests
+        working-directory: packages/js
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          npm test
+
+  publish-pypi:
+    name: publish kiff-guard to PyPI
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build sdist and wheel
+        working-directory: packages/python/kiff-guard
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/python/kiff-guard/dist
+
+  publish-npm:
+    name: publish @kiff/kiff-guard to npm
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for --provenance attestation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build
+        working-directory: packages/js
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish
+        working-directory: packages/js
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
