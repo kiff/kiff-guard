@@ -1,6 +1,6 @@
 {
   "name": "@kiff/kiff-guard",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Drop-in guard that puts KIFF clearance in front of any agent's tool calls — observe to audit, enforce to govern. TypeScript SDK.",
   "license": "MIT",
   "type": "module",
@@ -17,7 +17,7 @@
       "import": "./dist/adapters/openclaw.js"
     }
   },
-  "files": ["dist", "src", "README.md"],
+  "files": ["dist", "src", "!src/**/*.test.ts", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
@@ -32,6 +32,14 @@
   "homepage": "https://kiff.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kiff/kiff-guard"
+    "url": "git+https://github.com/kiff/kiff-guard.git",
+    "directory": "packages/js"
+  },
+  "bugs": {
+    "url": "https://github.com/kiff/kiff-guard/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
