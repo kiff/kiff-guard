@@ -37,9 +37,11 @@ We aim to acknowledge reports within 48 hours and provide a fix timeline within
 | Version | Supported |
 |---------|-----------|
 | 1.1.x   | ✓ current |
-| 1.0.x   | ✗ — contains GHSA-pending fail-open; upgrade to 1.1.0 |
+| 1.0.x   | ✗ — fail-open, [GHSA-vcg8-hv6f-fc89]; upgrade to 1.1.0 |
 
 ## Disclosure policy
 
 We follow coordinated disclosure. Once a fix is available we will publish a
 GitHub Security Advisory and credit the reporter (unless anonymity is requested).
+
+[GHSA-vcg8-hv6f-fc89]: https://github.com/kiff/kiff-guard/security/advisories/GHSA-vcg8-hv6f-fc89
