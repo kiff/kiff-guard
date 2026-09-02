@@ -30,7 +30,8 @@ from typing import Any, Dict, List, Optional, Protocol, Tuple
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from .decision import Decision, INVALID
+from .decision import ALLOWED, Decision, INVALID
+from urllib.parse import urlparse
 
 
 @dataclass
@@ -195,6 +196,32 @@ class ToolMap:
         return self._bindings.get(tool)
 
 
+
+def _require_secure_base_url(base_url: str, allow_insecure_http: bool) -> None:
+    """Refuse a plaintext base_url.
+
+    Every decide call carries the API key in an Authorization header, so an
+    http:// endpoint puts a live credential on the wire in cleartext and lets
+    anyone on the path rewrite the decision. Loopback is exempt: it is the
+    normal shape for local development and for the test doubles this SDK's own
+    conformance suite uses.
+    """
+    parsed = urlparse(base_url)
+    if parsed.scheme == "https":
+        return
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "http" and host in ("localhost", "127.0.0.1", "::1"):
+        return
+    if allow_insecure_http:
+        return
+    raise ValueError(
+        f"base_url {base_url!r} is not https. The API key is sent on every decide "
+        f"call, so a plaintext endpoint leaks it and lets the decision be rewritten. "
+        f"Use https, or pass allow_insecure_http=True if you have an out-of-band "
+        f"secure channel."
+    )
+
+
 class HTTPClient:
     """Real client for the cloud decide endpoint."""
 
@@ -205,11 +232,13 @@ class HTTPClient:
         base_url: str = "https://api.kiff.dev",
         timeout: float = 10.0,
         unmapped: str = "withhold",
+        allow_insecure_http: bool = False,
     ):
         if not api_key:
             raise ValueError("api_key is required")
         if unmapped not in ("withhold", "allow"):
             raise ValueError("unmapped must be 'withhold' or 'allow'")
+        _require_secure_base_url(base_url, allow_insecure_http)
         self._api_key = api_key
         self._tool_map = tool_map
         self._base = base_url.rstrip("/")
@@ -268,6 +297,20 @@ class HTTPClient:
             # Never fail open silently: no outcome -> invalid, and the
             # guard's enforce path Holds on any non-allowed outcome.
             return Decision(outcome=INVALID, reason=f"decide returned status {status} with no outcome")
+
+        # The outcome travels in the body by design — KIFF returns 400 for
+        # invalid, 429 for limit_exceeded and 502 for infra failures, all of
+        # which are real governance answers we must honor. But it never
+        # returns `allowed` on a non-2xx. So trust the body for every
+        # withheld outcome, and require a success status for the one outcome
+        # that lets a side effect run: otherwise a proxy, captive portal or
+        # misdirected base_url answering 500 with {"outcome":"allowed"}
+        # would clear the call.
+        if outcome == ALLOWED and not (200 <= status < 300):
+            return Decision(
+                outcome=INVALID,
+                reason=f"decide returned {status} with outcome=allowed; refusing to clear on a non-success status",
+            )
 
         reasons = payload.get("reasons") or []
         message = str(payload.get("message", ""))

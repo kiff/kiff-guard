@@ -75,7 +75,12 @@ export interface Receipt {
   args: Record<string, unknown>;
   outcome: string;
   reason: string;
-  executed: boolean;
+  /**
+   * Whether the side effect ran. Unset when the outcome is not observable at
+   * the adapter's seam — a framework-native approval flow that resumes without
+   * calling back into the guard. Absent means unknown, never false.
+   */
+  executed?: boolean;
   state: "observed" | "governed";
   proposalId?: string;
 }

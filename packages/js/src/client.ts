@@ -142,6 +142,34 @@ export interface HTTPClientOptions {
    * staged rollouts where the map is still being filled in.
    */
   unmapped?: "withhold" | "allow";
+  /**
+   * Permit a plaintext http:// baseUrl. The API key rides every decide call,
+   * so a plaintext endpoint leaks a live credential and lets anyone on the
+   * path rewrite the decision. Loopback is always permitted without this.
+   */
+  allowInsecureHttp?: boolean;
+}
+
+/** Refuse a plaintext baseUrl outside loopback. */
+function requireSecureBaseUrl(baseUrl: string, allowInsecureHttp: boolean): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`baseUrl ${JSON.stringify(baseUrl)} is not a valid URL`);
+  }
+  if (url.protocol === "https:") return;
+  const host = url.hostname.toLowerCase();
+  if (url.protocol === "http:" && (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1")) {
+    return;
+  }
+  if (allowInsecureHttp) return;
+  throw new Error(
+    `baseUrl ${JSON.stringify(baseUrl)} is not https. The API key is sent on every ` +
+      `decide call, so a plaintext endpoint leaks it and lets the decision be ` +
+      `rewritten. Use https, or pass allowInsecureHttp: true if you have an ` +
+      `out-of-band secure channel.`,
+  );
 }
 
 /** Real client for the cloud decide endpoint. */
@@ -164,7 +192,9 @@ export class HTTPClient implements Client {
     this.unmapped = unmapped;
     this.apiKey = opts.apiKey;
     this.toolMap = opts.toolMap;
-    this.base = (opts.baseUrl ?? "https://api.kiff.dev").replace(/\/+$/, "");
+    const baseUrl = opts.baseUrl ?? "https://api.kiff.dev";
+    requireSecureBaseUrl(baseUrl, opts.allowInsecureHttp ?? false);
+    this.base = baseUrl.replace(/\/+$/, "");
     this.timeoutMs = opts.timeoutMs ?? 10_000;
     const f = opts.fetchImpl ?? globalThis.fetch;
     if (typeof f !== "function") {
@@ -228,6 +258,18 @@ export class HTTPClient implements Client {
       // Never fail open silently: no outcome -> invalid, and the guard's
       // enforce path holds on any non-allowed outcome.
       return new Decision(INVALID, `decide returned status ${status} with no outcome`);
+    }
+
+    // The outcome travels in the body by design — KIFF returns 400 for
+    // invalid, 429 for limit_exceeded and 502 for infra failures, all real
+    // governance answers we must honor. But it never returns `allowed` on a
+    // non-2xx. So trust the body for every withheld outcome, and require a
+    // success status for the one outcome that lets a side effect run.
+    if (outcome === ALLOWED && !(status >= 200 && status < 300)) {
+      return new Decision(
+        INVALID,
+        `decide returned ${status} with outcome=allowed; refusing to clear on a non-success status`,
+      );
     }
 
     const reasons = Array.isArray(payload.reasons) ? (payload.reasons as unknown[]) : [];

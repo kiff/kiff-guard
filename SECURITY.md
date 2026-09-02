@@ -36,7 +36,8 @@ We aim to acknowledge reports within 48 hours and provide a fix timeline within
 
 | Version | Supported |
 |---------|-----------|
-| 1.1.x   | ✓ current |
+| 1.2.x   | ✓ current |
+| 1.1.x   | ✗ — upgrade to 1.2.0 |
 | 1.0.x   | ✗ — fail-open, [GHSA-vcg8-hv6f-fc89]; upgrade to 1.1.0 |
 
 ## Disclosure policy

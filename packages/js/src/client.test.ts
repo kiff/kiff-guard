@@ -226,3 +226,60 @@ describe("HTTPClient.decide — unbound tools", () => {
     ).toThrow(/unmapped must be/);
   });
 });
+
+describe("HTTPClient.decide — status handling and transport security", () => {
+  const apiKey = "kiff_live_t_" + "y".repeat(32);
+  const bound = () => new ToolMap().bind("refund_order", "REFUND_ORDER", "Order", "order_id");
+  const respond = (status: number, body: unknown): typeof fetch =>
+    async () => new Response(JSON.stringify(body), { status });
+
+  it("refuses an allowed outcome arriving on a non-success status", async () => {
+    const client = new HTTPClient({
+      apiKey,
+      toolMap: bound(),
+      fetchImpl: respond(500, { outcome: "allowed" }),
+    });
+
+    const d = await client.decide("t", "a", "refund_order", { order_id: "o1" });
+
+    expect(d.allowed).toBe(false);
+    expect(d.outcome).toBe("invalid");
+    expect(d.reason).toContain("non-success status");
+  });
+
+  it("still honours withheld outcomes on a non-success status", async () => {
+    // KIFF reports limit_exceeded as 429 and invalid as 400 by design; the
+    // outcome travels in the body and must be honoured.
+    const client = new HTTPClient({
+      apiKey,
+      toolMap: bound(),
+      fetchImpl: respond(429, { outcome: "limit_exceeded" }),
+    });
+
+    const d = await client.decide("t", "a", "refund_order", { order_id: "o1" });
+
+    expect(d.outcome).toBe("limit_exceeded");
+    expect(d.withheld).toBe(true);
+  });
+
+  it("refuses a plaintext baseUrl", () => {
+    expect(
+      () => new HTTPClient({ apiKey, toolMap: new ToolMap(), baseUrl: "http://api.kiff.dev" }),
+    ).toThrow(/not https/);
+  });
+
+  it("permits loopback and an explicit opt-in", () => {
+    expect(
+      () => new HTTPClient({ apiKey, toolMap: new ToolMap(), baseUrl: "http://127.0.0.1:8931" }),
+    ).not.toThrow();
+    expect(
+      () =>
+        new HTTPClient({
+          apiKey,
+          toolMap: new ToolMap(),
+          baseUrl: "http://kiff.internal",
+          allowInsecureHttp: true,
+        }),
+    ).not.toThrow();
+  });
+});

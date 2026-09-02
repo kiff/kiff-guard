@@ -1,6 +1,6 @@
 {
   "name": "@kiff/kiff-guard",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Drop-in guard that puts KIFF clearance in front of any agent's tool calls — observe to audit, enforce to govern. TypeScript SDK.",
   "license": "MIT",
   "type": "module",
