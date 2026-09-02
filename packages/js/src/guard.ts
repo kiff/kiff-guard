@@ -174,6 +174,30 @@ export class Guard {
     this.recordGoverned(tool, args, decision, false);
   }
 
+  /**
+   * Record a receipt for an action handed to a human reviewer through the
+   * host framework's own approval flow.
+   *
+   * Distinct from recordWithheld because the terminal outcome is not
+   * observable at this seam: the framework pauses, the human answers, and if
+   * they approve the tool runs without calling back into the guard. Recording
+   * `executed: false` there would assert that the side effect did not happen,
+   * when it may well have. This records what is actually known — the call was
+   * governed and routed to a human — and leaves `executed` unset.
+   */
+  recordPendingApproval(tool: string, args: Record<string, unknown>, decision: Decision): void {
+    this.receipts.push({
+      ts: Date.now() / 1000,
+      agent: this.agent,
+      tool,
+      args: { ...args },
+      outcome: decision.outcome,
+      reason: decision.reason,
+      state: "governed",
+      proposalId: decision.proposalId,
+    });
+  }
+
   // --- audit ---------------------------------------------------------
 
   private recordObserved(tool: string, args: Record<string, unknown>): void {

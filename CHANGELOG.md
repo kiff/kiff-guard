@@ -4,6 +4,50 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
+## 1.2.0 — transport hardening and an honest approval receipt
+
+### Security
+
+**`allowed` is no longer accepted on a non-success status.** KIFF puts the
+outcome in the response body by design and uses the HTTP status as a hint — it
+returns 400 for `invalid`, 429 for `limit_exceeded` and 502 for infrastructure
+failures, all of which are real governance answers the client must honour. It
+never returns `allowed` on a non-2xx. The client now trusts the body for every
+*withheld* outcome and additionally requires a success status for the one
+outcome that lets a side effect run, so a proxy, captive portal or misdirected
+`base_url` answering `500 {"outcome":"allowed"}` can no longer clear a call.
+
+**A plaintext `base_url` is refused.** The API key rides every decide call, so
+an `http://` endpoint puts a live credential on the wire and lets anyone on the
+path rewrite the decision. Loopback (`localhost`, `127.0.0.1`, `::1`) is exempt
+— it is the normal shape for local development and for this SDK's own test
+doubles. For an out-of-band secure channel, opt in explicitly:
+
+```python
+HTTPClient(api_key=..., tool_map=..., allow_insecure_http=True)   # Python
+```
+```ts
+new HTTPClient({ apiKey, toolMap, allowInsecureHttp: true })      // TypeScript
+```
+
+### Fixed
+
+**The OpenClaw adapter recorded `executed: false` for approvals that executed.**
+On `approval_required` it wrote a withheld receipt before returning
+`requireApproval`. OpenClaw then pauses, routes to a human, and — if they
+approve — runs the tool itself without calling back into the guard. The receipt
+kept asserting the side effect had not happened. Money moved; the ledger said it
+did not, on the very path the adapter exists to support.
+
+`approval_required` now records through a new `recordPendingApproval`, which
+leaves `executed` **unset** rather than false: the terminal outcome is genuinely
+not observable at this seam, and absent is honest where false was wrong. The
+blocked/invalid/limit_exceeded path still records `executed: false`, which is
+accurate — the tool provably does not run. `Receipt.executed` is now optional;
+**absent means unknown, never false.** TypeScript only.
+
+All three were found by the same adversarial audit as 1.1.0.
+
 ## 1.1.0 — unbound tools no longer clear themselves
 
 ### Security

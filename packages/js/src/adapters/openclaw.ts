@@ -114,10 +114,13 @@ export function kiffBeforeToolCall(
       return undefined; // proceed
     }
 
-    // Withheld. Record exactly one governed receipt either way.
-    guard.recordWithheld(tool, args, decision);
-
     if (decision.outcome === "approval_required") {
+      // Do NOT record executed:false here. OpenClaw pauses, routes to a human,
+      // and runs the tool itself if they approve — without calling back into
+      // the guard. A withheld receipt would assert the side effect did not
+      // happen for calls where it did.
+      guard.recordPendingApproval(tool, args, decision);
+
       // Native human-in-the-loop: OpenClaw pauses and routes to /approve.
       return {
         requireApproval: {
@@ -130,7 +133,9 @@ export function kiffBeforeToolCall(
       };
     }
 
-    // blocked / invalid / limit_exceeded / any unknown outcome -> block.
+    // blocked / invalid / limit_exceeded / any unknown outcome -> block. The
+    // tool provably does not run, so executed:false is accurate here.
+    guard.recordWithheld(tool, args, decision);
     return { block: true, blockReason: `KIFF withheld ${tool}: ${decision.outcome} — ${decision.reason}` };
   };
 }

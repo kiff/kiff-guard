@@ -62,9 +62,17 @@ describe("openclaw before_tool_call", () => {
     expect(out.requireApproval!.title).toContain("refund_order");
     expect(out.requireApproval!.timeoutBehavior).toBe("deny"); // fail closed on timeout
     expect(out.block).toBeUndefined();
-    // still exactly one governed receipt, executed=false
+
+    // Exactly one governed receipt — but `executed` is deliberately unset,
+    // not false. OpenClaw pauses here, routes to a human, and runs the tool
+    // itself if they approve, without calling back into the guard. Asserting
+    // executed=false (as this test previously did) made the ledger claim the
+    // side effect did not happen for every approval that was granted.
     expect(guard.receipts.length).toBe(1);
-    expect(guard.receipts.at(-1)!.executed).toBe(false);
+    const receipt = guard.receipts.at(-1)!;
+    expect(receipt.state).toBe("governed");
+    expect(receipt.outcome).toBe("approval_required");
+    expect(receipt.executed).toBeUndefined();
   });
 
   it("fail-closed on transport error blocks", async () => {
