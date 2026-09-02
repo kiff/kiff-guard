@@ -176,3 +176,53 @@ describe("HTTPClient.observeGuard", () => {
     });
   });
 });
+
+describe("HTTPClient.decide — unbound tools", () => {
+  const apiKey = "kiff_live_t_" + "y".repeat(32);
+
+  // An unbound tool has no action to propose, so KIFF is never asked about it.
+  // Synthesizing an "allowed" here is a fail-open whose receipt reads as
+  // governed: the call runs, no HTTP request leaves the process, and the
+  // ledger claims the runtime cleared it.
+  it("withholds by default and never calls KIFF", async () => {
+    let calls = 0;
+    const fetchImpl: typeof fetch = async () => {
+      calls += 1;
+      return new Response("{}", { status: 200 });
+    };
+    const client = new HTTPClient({ apiKey, toolMap: new ToolMap(), fetchImpl });
+
+    const decision = await client.decide("t", "a", "wire_transfer", { amount: 999999 });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.withheld).toBe(true);
+    expect(decision.outcome).toBe("invalid");
+    expect(decision.reason).toContain("not bound");
+    expect(calls).toBe(0);
+  });
+
+  it("clears unbound tools only when explicitly opted in", async () => {
+    const client = new HTTPClient({
+      apiKey,
+      toolMap: new ToolMap(),
+      unmapped: "allow",
+      fetchImpl: async () => new Response("{}", { status: 200 }),
+    });
+
+    const decision = await client.decide("t", "a", "wire_transfer", {});
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.reason).toContain("unmapped");
+  });
+
+  it("rejects an invalid unmapped setting", () => {
+    expect(
+      () =>
+        new HTTPClient({
+          apiKey,
+          toolMap: new ToolMap(),
+          unmapped: "yolo" as unknown as "allow",
+        }),
+    ).toThrow(/unmapped must be/);
+  });
+});

@@ -53,4 +53,4 @@ export { exportYaml } from "./draft.js";
 // runtime read of package.json across ESM, CJS, and bundlers, so this stays
 // a literal — and version.test.ts asserts it equals package.json, so the two
 // cannot drift without turning CI red.
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";

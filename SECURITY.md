@@ -36,7 +36,8 @@ We aim to acknowledge reports within 48 hours and provide a fix timeline within
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | ✓ current |
+| 1.1.x   | ✓ current |
+| 1.0.x   | ✗ — contains GHSA-pending fail-open; upgrade to 1.1.0 |
 
 ## Disclosure policy
 

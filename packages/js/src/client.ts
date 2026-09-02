@@ -133,6 +133,15 @@ export interface HTTPClientOptions {
   timeoutMs?: number;
   /** injectable for tests; defaults to the global fetch. */
   fetchImpl?: typeof fetch;
+  /**
+   * What to do with a tool that is not bound in the ToolMap. An unbound tool
+   * has no action to propose, so KIFF is never asked about it.
+   *
+   * `"withhold"` (default) returns an invalid decision, so enforce refuses.
+   * `"allow"` restores the pre-1.1.0 behavior of clearing unbound tools, for
+   * staged rollouts where the map is still being filled in.
+   */
+  unmapped?: "withhold" | "allow";
 }
 
 /** Real client for the cloud decide endpoint. */
@@ -142,11 +151,17 @@ export class HTTPClient implements Client {
   private readonly base: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly unmapped: "withhold" | "allow";
 
   constructor(opts: HTTPClientOptions) {
     if (!opts.apiKey) {
       throw new Error("apiKey is required");
     }
+    const unmapped = opts.unmapped ?? "withhold";
+    if (unmapped !== "withhold" && unmapped !== "allow") {
+      throw new Error(`unmapped must be "withhold" or "allow"`);
+    }
+    this.unmapped = unmapped;
     this.apiKey = opts.apiKey;
     this.toolMap = opts.toolMap;
     this.base = (opts.baseUrl ?? "https://api.kiff.dev").replace(/\/+$/, "");
@@ -166,9 +181,24 @@ export class HTTPClient implements Client {
   ): Promise<Decision> {
     const binding = this.toolMap.get(tool);
 
-    // Unmapped tool: no action to propose. Cleared + audited.
+    // Unmapped tool: there is no action to propose, so KIFF is never asked.
+    // Enforce must not synthesize an "allowed" for a call the runtime never
+    // saw — that is a fail-open whose receipt would read as governed.
+    // Default: withhold. `unmapped: "allow"` opts back into the permissive
+    // behavior for staged rollouts.
     if (!binding) {
-      return new Decision(ALLOWED, `${tool} unmapped; cleared and audited`);
+      if (this.unmapped === "allow") {
+        return new Decision(
+          ALLOWED,
+          `${tool} unmapped; cleared and audited (unmapped="allow")`,
+        );
+      }
+      return new Decision(
+        INVALID,
+        `${tool} is not bound in the ToolMap; KIFF was not asked. ` +
+          `Bind it with new ToolMap().bind(...) or pass unmapped: "allow" ` +
+          `to HTTPClient to clear unbound tools.`,
+      );
     }
 
     const entityId = args[binding.entityArg];

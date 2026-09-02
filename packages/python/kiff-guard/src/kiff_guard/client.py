@@ -204,13 +204,17 @@ class HTTPClient:
         tool_map: ToolMap,
         base_url: str = "https://api.kiff.dev",
         timeout: float = 10.0,
+        unmapped: str = "withhold",
     ):
         if not api_key:
             raise ValueError("api_key is required")
+        if unmapped not in ("withhold", "allow"):
+            raise ValueError("unmapped must be 'withhold' or 'allow'")
         self._api_key = api_key
         self._tool_map = tool_map
         self._base = base_url.rstrip("/")
         self._timeout = timeout
+        self._unmapped = unmapped
 
     @property
     def tool_map(self) -> ToolMap:
@@ -223,9 +227,25 @@ class HTTPClient:
     def decide(self, tenant: str, agent: str, tool: str, args: Dict[str, Any]) -> Decision:
         binding = self._tool_map.get(tool)
 
-        # Unmapped tool: no action to propose. Cleared + audited.
+        # Unmapped tool: there is no action to propose, so KIFF is never
+        # asked. Enforce must not synthesize an "allowed" for a call the
+        # runtime never saw — that is a fail-open whose receipt would read
+        # as governed. Default: withhold. `unmapped="allow"` opts back into
+        # the permissive behavior for staged rollouts.
         if binding is None:
-            return Decision(outcome="allowed", reason=f"{tool} unmapped; cleared and audited")
+            if self._unmapped == "allow":
+                return Decision(
+                    outcome="allowed",
+                    reason=f"{tool} unmapped; cleared and audited (unmapped='allow')",
+                )
+            return Decision(
+                outcome=INVALID,
+                reason=(
+                    f"{tool} is not bound in the ToolMap; KIFF was not asked. "
+                    f"Bind it with ToolMap().bind(...) or pass unmapped='allow' "
+                    f"to HTTPClient to clear unbound tools."
+                ),
+            )
 
         entity_id = args.get(binding.entity_arg)
         if entity_id is None:

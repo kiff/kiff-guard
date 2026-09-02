@@ -44,8 +44,16 @@ def test_client_never_sends_roles():
     assert "roles" not in cap["body"]
 
 
-def test_client_unmapped_is_cleared():
+def test_client_unmapped_withholds_by_default():
+    # An unbound tool never reaches KIFF, so enforce must not synthesize an
+    # allow for it. Default is fail-safe.
     c = HTTPClient(api_key="kiff_live_t_" + "y" * 32, tool_map=ToolMap())
+    d = c.decide("t", "a", "mystery", {"x": 1})
+    assert d.outcome == "invalid" and d.withheld and "not bound" in d.reason
+
+
+def test_client_unmapped_is_cleared_when_opted_in():
+    c = HTTPClient(api_key="kiff_live_t_" + "y" * 32, tool_map=ToolMap(), unmapped="allow")
     d = c.decide("t", "a", "mystery", {"x": 1})
     assert d.outcome == "allowed" and "unmapped" in d.reason
 
