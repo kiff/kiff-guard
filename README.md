@@ -110,6 +110,32 @@ handler continuation) and **vote / inverted-control** (the framework runs
 the tool; the hook only votes allow/block). Each adapter documents its
 verified pre-tool-execution seam and block contract in its module docstring.
 
+## Only mapped tools are governed
+
+`ToolMap` is the list of tools KIFF is asked about. A tool that is not bound
+has no action to propose, so the runtime is never consulted — and since 1.1.0
+the guard **withholds** rather than clearing it:
+
+```python
+guard = Guard(mode="enforce", client=HTTPClient(api_key=..., tool_map=tool_map))
+# refund_order is bound  -> KIFF decides
+# wire_transfer is not   -> invalid: "not bound in the ToolMap; KIFF was not asked"
+```
+
+This is deliberate and it is the safe direction. Before 1.1.0 an unbound tool
+was cleared with the reason `"unmapped; cleared and audited"`, which meant a
+binding you forgot became an ungoverned tool with a receipt claiming otherwise.
+
+For a staged rollout where the map is still being filled in, opt back in
+explicitly — but understand that such a deployment governs only what you
+remembered to map:
+
+```python
+HTTPClient(api_key=..., tool_map=tool_map, unmapped="allow")
+```
+
+Use `kiff-scan` or `kiff scan` to find consequential calls you have not bound.
+
 ## Compatibility
 
 Both SDKs share a version number and are released from the same tag.
