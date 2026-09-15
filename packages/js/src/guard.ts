@@ -41,6 +41,22 @@ export interface GuardOptions {
   catalog?: Catalog;
   /** share a ledger across guards for one audit log over every agent. */
   ledger?: Receipt[];
+  /**
+   * Identifier for the agent run these calls belong to, sent as run
+   * context so decisions within one run can be correlated (kiff-cloud
+   * RFC 039).
+   */
+  runId?: string;
+  /**
+   * Tools whose *results* bring content from somewhere the agent's
+   * instructions do not come from: a fetched page, a third-party ticket,
+   * a document, a tool reaching outside this run's remit.
+   *
+   * The integrator declares the set up front; the guard applies it
+   * mechanically by tool name. The model can choose to call such a tool,
+   * and calling it can only ever ADD taint, never remove it.
+   */
+  untrustedTools?: Iterable<string>;
 }
 
 export interface GuardConnectOptions {
@@ -62,6 +78,11 @@ export class Guard {
   readonly mode: GuardMode;
   readonly catalog: Catalog;
   readonly receipts: Receipt[];
+  /** @see GuardOptions.untrustedTools */
+  readonly untrustedTools: ReadonlySet<string>;
+  private runId: string;
+  private untrustedInputSeen = false;
+  private runContextOn: boolean;
 
   constructor(opts: GuardOptions = {}) {
     const mode = opts.mode ?? "observe";
@@ -79,6 +100,95 @@ export class Guard {
     this.mode = mode;
     this.catalog = opts.catalog ?? new Catalog();
     this.receipts = opts.ledger ?? [];
+    // Run context (kiff-cloud RFC 039). Asserted by this guard — which is
+    // trusted integrator code — and never by the model.
+    this.runId = opts.runId ?? "";
+    this.untrustedTools = new Set(opts.untrustedTools ?? []);
+    // Opt-in, and off until the integrator asks for it. A guard that
+    // never opts in sends no run_context and calls Client.decide with its
+    // original signature, so every Client written before RFC 039 —
+    // including custom ones outside this repo — keeps working.
+    //
+    // Opting out is not a way to dodge the control: an action that
+    // declares a run-context dependency and receives no assertion fails
+    // closed cloud-side. Sending nothing means "I have not established
+    // anything", never "this run is clean".
+    this.runContextOn = this.runId !== "" || this.untrustedTools.size > 0;
+  }
+
+  /**
+   * Assert that content from an untrusted source has entered this run.
+   * Monotonic: once asserted it holds until startRun().
+   *
+   * Call it where the untrusted content actually arrives.
+   * `untrustedTools` does this automatically for tools named up front;
+   * this is the manual path for everything else (a webhook body, a
+   * user-pasted document, a file read outside the tool layer).
+   */
+  markUntrustedInput(source = ""): void {
+    this.untrustedInputSeen = true;
+    this.runContextOn = true;
+    if (source) {
+      this.catalog.record(this.agent, `kiff.untrusted_input:${source}`, {});
+    }
+  }
+
+  /**
+   * Begin a new run: clears the untrusted-input assertion and sets the
+   * run id. It is an integrator action by construction — the model has no
+   * route to it — which is what makes clearing taint here safe and
+   * clearing it anywhere else not. There is deliberately no untaint().
+   */
+  startRun(runId = ""): void {
+    this.runId = runId;
+    this.untrustedInputSeen = false;
+    this.runContextOn = true;
+  }
+
+  /** Whether this run has been marked as having consumed untrusted input. */
+  get untrustedInput(): boolean {
+    return this.untrustedInputSeen;
+  }
+
+  /**
+   * The run context to send with a decision, or undefined when this guard
+   * never opted in.
+   *
+   * Always includes `untrusted_input`, including when false: an explicit
+   * clean assertion and no assertion at all are different facts to the
+   * runtime, and a declaring action fails closed on the second. A guard
+   * that sends this is making the first claim and is responsible for it
+   * being true.
+   */
+  runContext(): Record<string, unknown> | undefined {
+    if (!this.runContextOn) return undefined;
+    const ctx: Record<string, unknown> = { untrusted_input: this.untrustedInputSeen };
+    if (this.runId) ctx.run_id = this.runId;
+    return ctx;
+  }
+
+  /**
+   * Apply the declared untrusted-tool set. Called after a tool has run,
+   * so the taint lands on everything the agent does *next* — the causal
+   * order that matters. Reading a public issue is not itself the problem;
+   * what the agent does afterwards is.
+   */
+  private noteUntrustedTool(tool: string): void {
+    if (this.untrustedTools.has(tool)) {
+      this.untrustedInputSeen = true;
+    }
+  }
+
+  /**
+   * Call the client, passing run context only when this guard has any.
+   * Keeps the Client contract unchanged for callers that never opted in.
+   */
+  private async decideWithContext(tool: string, args: Record<string, unknown>): Promise<Decision> {
+    const ctx = this.runContext();
+    if (ctx === undefined) {
+      return this.client!.decide(this.tenant, this.agent, tool, args);
+    }
+    return this.client!.decide(this.tenant, this.agent, tool, args, ctx);
   }
 
   /**
@@ -89,6 +199,7 @@ export class Guard {
   observe(tool: string, args: Record<string, unknown>): void {
     this.catalog.record(this.agent, tool, args);
     this.recordObserved(tool, args);
+    this.noteUntrustedTool(tool);
   }
 
   /**
@@ -108,7 +219,7 @@ export class Guard {
       throw new Error("decideOnly requires a client (enforce mode)");
     }
     this.catalog.record(this.agent, tool, args);
-    return this.client.decide(this.tenant, this.agent, tool, args);
+    return this.decideWithContext(tool, args);
   }
 
   /**
@@ -123,13 +234,15 @@ export class Guard {
     if (this.mode === "observe") {
       const result = await run();
       this.recordObserved(tool, args);
+      this.noteUntrustedTool(tool);
       return result;
     }
 
-    const decision = await this.client!.decide(this.tenant, this.agent, tool, args);
+    const decision = await this.decideWithContext(tool, args);
     if (decision.allowed) {
       const result = await run();
       this.recordGoverned(tool, args, decision, true);
+      this.noteUntrustedTool(tool);
       return result;
     }
     this.recordGoverned(tool, args, decision, false);
@@ -163,6 +276,12 @@ export class Guard {
    */
   recordExecuted(tool: string, args: Record<string, unknown>, decision: Decision): void {
     this.recordGoverned(tool, args, decision, true);
+    // Vote shape runs the tool outside the guard, so this is the only
+    // point where the guard learns it actually ran. Without it, a
+    // vote-shape adapter would never taint and every declared untrusted
+    // tool would be invisible to run context — in exactly the adapters
+    // most likely to be reading third-party content.
+    this.noteUntrustedTool(tool);
   }
 
   /**

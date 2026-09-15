@@ -30,7 +30,13 @@ import { ALLOWED, Decision, INVALID } from "./decision.js";
  * because JS HTTP is async and the OpenClaw hook is already async.
  */
 export interface Client {
-  decide(tenant: string, agent: string, tool: string, args: Record<string, unknown>): Promise<Decision>;
+  decide(
+    tenant: string,
+    agent: string,
+    tool: string,
+    args: Record<string, unknown>,
+    runContext?: Record<string, unknown>,
+  ): Promise<Decision>;
 }
 
 /** Runtime metadata sent to KIFF Cloud when a guard opts into discovery. */
@@ -208,6 +214,7 @@ export class HTTPClient implements Client {
     agent: string,
     tool: string,
     args: Record<string, unknown>,
+    runContext?: Record<string, unknown>,
   ): Promise<Decision> {
     const binding = this.toolMap.get(tool);
 
@@ -244,13 +251,19 @@ export class HTTPClient implements Client {
       if (k !== binding.entityArg) parameters[k] = v;
     }
 
-    const body = {
+    const body: Record<string, unknown> = {
       entity_id: String(entityId),
       entity_type: binding.entityType,
       action_name: binding.action,
       actor_id: agent,
       parameters,
     };
+    // Run context travels as a sibling of the proposal, never inside
+    // `parameters` (kiff-cloud RFC 039). Parameters are the model-supplied
+    // payload: a taint flag the model can write is one an injected
+    // instruction can clear, so the cloud refuses kiff_-prefixed keys
+    // there rather than merging them.
+    if (runContext) body.run_context = runContext;
 
     const { status, payload } = await this.post("/v1/proposals/decide", body);
     const outcome = payload && typeof payload.outcome === "string" ? payload.outcome : "";

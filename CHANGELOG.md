@@ -4,6 +4,74 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
+## 1.3.0 — trusted run context
+
+### Added
+
+**Run context: the facts a harness asserts that the model cannot.** KIFF
+Cloud's decide API gained a `run_context` field (kiff-cloud RFC 039). The
+only proposal fields describing *why* an action is proposed —
+`reasoning_summary`, `confidence` — are written by the model, so the
+runtime had no independent account of the run. The guard is trusted
+integrator code, which is where those facts belong.
+
+```python
+guard = Guard(client=c, mode="enforce",
+              untrusted_tools={"read_public_issue", "fetch_url"})
+```
+
+```ts
+const guard = new Guard({ client: c, mode: "enforce",
+                          untrustedTools: ["read_public_issue", "fetch_url"] });
+```
+
+`untrusted_tools` / `untrustedTools` names the tools whose *results* bring
+content from somewhere the agent's instructions do not: a fetched page, a
+third-party ticket, a document. You declare the set up front; the guard
+applies it mechanically by tool name. The model can choose to call such a
+tool, and calling it can only ever *add* taint. `mark_untrusted_input()` /
+`markUntrustedInput()` is the manual path for content that does not arrive
+through a tool, and `start_run()` / `startRun()` begins a fresh run.
+
+Four properties, the same in both SDKs:
+
+- **Causal order.** The untrusted read itself is clean; everything after
+  it is not. Taint applies after the tool runs.
+- **One-way.** There is no `untaint()`; the property is read-only, and a
+  test asserts those methods do not exist. The only reset is starting a
+  new run, which the model has no route to.
+- **Vote shape taints too**, on `record_executed` / `recordExecuted` — the
+  only point where a guard whose adapter runs the tool itself learns that
+  it ran.
+- **Observe mode tracks it**, so flipping to enforce does not start from a
+  false clean slate.
+
+### Compatibility
+
+Opt-in by construction. A guard that names no untrusted tools and sets no
+run id sends no `run_context` and calls `Client.decide` with its original
+signature, so every existing `Client` implementation — including custom
+ones outside this repo — keeps working untouched.
+
+Opting out is not a way to dodge the control: an action that declares a
+run-context dependency and receives no assertion fails closed cloud-side.
+Sending nothing means "I have not established anything", never "this run
+is clean".
+
+### Requires
+
+KIFF Cloud with RFC 039 deployed. Against an older runtime the field is
+ignored, since unknown JSON fields are dropped — an integrator would
+believe they were governed while nothing read it. Upgrade the runtime
+first.
+
+### Honest limit
+
+Run context is harness-*asserted*, not proven. A compromised integrator
+can assert a clean run, exactly as one can decline to call the gate at
+all. It defends against the model being manipulated, not against the
+integrator being compromised.
+
 ## 1.2.0 — transport hardening and an honest approval receipt
 
 ### Security
