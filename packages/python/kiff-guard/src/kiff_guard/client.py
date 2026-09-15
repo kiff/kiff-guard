@@ -115,7 +115,14 @@ class Client(Protocol):
     """What the guard needs from a decider. Implemented by HTTPClient;
     tests can pass any object with this method."""
 
-    def decide(self, tenant: str, agent: str, tool: str, args: Dict[str, Any]) -> Decision:
+    def decide(
+        self,
+        tenant: str,
+        agent: str,
+        tool: str,
+        args: Dict[str, Any],
+        run_context: Optional[Dict[str, Any]] = None,
+    ) -> Decision:
         ...
 
 
@@ -253,7 +260,14 @@ class HTTPClient:
         because the client is what speaks decide."""
         return self._tool_map
 
-    def decide(self, tenant: str, agent: str, tool: str, args: Dict[str, Any]) -> Decision:
+    def decide(
+        self,
+        tenant: str,
+        agent: str,
+        tool: str,
+        args: Dict[str, Any],
+        run_context: Optional[Dict[str, Any]] = None,
+    ) -> Decision:
         binding = self._tool_map.get(tool)
 
         # Unmapped tool: there is no action to propose, so KIFF is never
@@ -290,6 +304,13 @@ class HTTPClient:
             "actor_id": agent,
             "parameters": {k: v for k, v in args.items() if k != binding.entity_arg},
         }
+        # Run context travels as a sibling of the proposal, never inside
+        # `parameters` (kiff-cloud RFC 039). Parameters are the
+        # model-supplied payload: a taint flag the model can write is one
+        # an injected instruction can clear, so the cloud refuses
+        # kiff_-prefixed keys there rather than merging them.
+        if run_context:
+            body["run_context"] = run_context
 
         status, payload = self._post("/v1/proposals/decide", body)
         outcome = str(payload.get("outcome", "")) if payload else ""

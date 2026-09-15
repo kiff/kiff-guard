@@ -35,7 +35,7 @@ KIFF account. The guard logic lives here, once; adapters add none.
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from .catalog import Catalog
 from .client import Client
@@ -55,6 +55,8 @@ class Guard:
         mode: str = "observe",
         catalog: Optional[Catalog] = None,
         ledger: Optional[List[Receipt]] = None,
+        run_id: str = "",
+        untrusted_tools: Iterable[str] = (),
     ):
         if mode not in ("observe", "enforce"):
             raise ValueError("mode must be 'observe' or 'enforce'")
@@ -68,6 +70,109 @@ class Guard:
         self.mode = mode
         self.catalog = catalog if catalog is not None else Catalog()
         self.receipts: List[Receipt] = ledger if ledger is not None else []
+        # Run context (kiff-cloud RFC 039). Asserted by this guard — which
+        # is trusted integrator code — and never by the model.
+        #
+        # `untrusted_tools` names the tools whose *results* bring content
+        # from somewhere the agent's instructions do not come from: a
+        # fetched page, a third-party ticket, a document, a tool reaching
+        # outside this run's remit. The integrator declares the set up
+        # front; the guard applies it mechanically by tool name. The model
+        # can choose to call such a tool, and calling it can only ever ADD
+        # taint, never remove it.
+        self.run_id = run_id
+        self.untrusted_tools = frozenset(untrusted_tools)
+        self._untrusted_input = False
+        # Run context is opt-in, and stays off until the integrator asks
+        # for it by naming untrusted tools, setting a run id, or calling
+        # mark_untrusted_input/start_run. A guard that never opts in sends
+        # no run_context field and works with any Client implementation
+        # written before RFC 039 — including custom ones outside this
+        # repo, which is why this is a flag rather than an always-on
+        # keyword argument.
+        #
+        # Opting out is not a way to dodge the control: an action that
+        # declares a run-context dependency and receives no assertion
+        # fails closed cloud-side. Sending nothing means "I have not
+        # established anything", not "this run is clean".
+        self._run_context_on = bool(run_id) or bool(self.untrusted_tools)
+
+    # ---- run context (kiff-cloud RFC 039) -------------------------------
+    #
+    # The runtime has no independent account of what happened in a run:
+    # the only proposal fields that say *why* an action is proposed are
+    # written by the model. These methods are how a harness supplies that
+    # missing fact, from trusted code.
+    #
+    # Deliberately one-way. There is no clear()/untaint() method, because
+    # the whole point is that nothing the model can influence may reset
+    # it. A new run gets a new run context via `start_run`, which is an
+    # explicit act by the integrator, not something a tool result can do.
+
+    def mark_untrusted_input(self, source: str = "") -> None:
+        """Assert that content from an untrusted source has entered this
+        run. Monotonic: once asserted it holds until `start_run`.
+
+        Call this where the untrusted content actually arrives. The
+        `untrusted_tools` set does it automatically for tools you named up
+        front; this is the manual path for everything else (a webhook body,
+        a user-pasted document, a file read outside the tool layer)."""
+        self._untrusted_input = True
+        self._run_context_on = True
+        if source:
+            self.catalog.record(self.agent, f"kiff.untrusted_input:{source}", {})
+
+    def start_run(self, run_id: str = "") -> None:
+        """Begin a new run: clears the untrusted-input assertion and sets
+        the run id. Call it between independent tasks on a long-lived
+        guard. It is an integrator action by construction — the model has
+        no route to it — which is what makes clearing taint here safe and
+        clearing it anywhere else not."""
+        self.run_id = run_id
+        self._untrusted_input = False
+        self._run_context_on = True
+
+    @property
+    def untrusted_input(self) -> bool:
+        """Whether this run has been marked as having consumed untrusted
+        input. Read-only on purpose: see mark_untrusted_input."""
+        return self._untrusted_input
+
+    def run_context(self) -> Optional[Dict[str, Any]]:
+        """The run context to send with a decision.
+
+        Always includes `untrusted_input`, including when False. An
+        explicit clean assertion and no assertion at all are different
+        facts to the runtime: a declaring action fails closed on the
+        second, because absence is not evidence of a clean run. A guard
+        that sends this dict is making the first claim, and is
+        responsible for it being true.
+
+        None when this guard never opted in, so the decide call is made
+        without the field and any pre-RFC-039 Client keeps working."""
+        if not self._run_context_on:
+            return None
+        ctx: Dict[str, Any] = {"untrusted_input": self._untrusted_input}
+        if self.run_id:
+            ctx["run_id"] = self.run_id
+        return ctx
+
+    def _decide(self, tool: str, args: Dict[str, Any]) -> Decision:
+        """Call the client, passing run context only when this guard has
+        any. Keeps the Client contract unchanged for callers that never
+        opted in."""
+        ctx = self.run_context()
+        if ctx is None:
+            return self.client.decide(self.tenant, self.agent, tool, args)
+        return self.client.decide(self.tenant, self.agent, tool, args, run_context=ctx)
+
+    def _note_untrusted_tool(self, tool: str) -> None:
+        """Apply the declared untrusted-tool set. Called after a tool has
+        run, so the taint lands on everything the agent does *next* — the
+        causal order that matters. Reading a public issue is not itself
+        the problem; what the agent does afterwards is."""
+        if tool in self.untrusted_tools:
+            self._untrusted_input = True
 
     def observe(self, tool: str, args: Dict[str, Any]) -> None:
         """Record an observed receipt and learn the catalog. No decision,
@@ -78,6 +183,7 @@ class Guard:
         and no tenant."""
         self.catalog.record(self.agent, tool, args)
         self._record_observed(tool, args)
+        self._note_untrusted_tool(tool)
 
     def decide_only(self, tool: str, args: Dict[str, Any]) -> Decision:
         """Ask KIFF to decide and return the Decision WITHOUT running the
@@ -95,7 +201,7 @@ class Guard:
         if self.client is None:
             raise ValueError("decide_only requires a client (enforce mode)")
         self.catalog.record(self.agent, tool, args)
-        return self.client.decide(self.tenant, self.agent, tool, args)
+        return self._decide(tool, args)
 
     def evaluate(self, tool: str, args: Dict[str, Any], run: Callable[[], Any]) -> Any:
         """Convenience entry point for middleware frameworks that let the
@@ -112,12 +218,14 @@ class Guard:
         if self.mode == "observe":
             result = run()
             self._record_observed(tool, args)
+            self._note_untrusted_tool(tool)
             return result
 
-        decision = self.client.decide(self.tenant, self.agent, tool, args)
+        decision = self._decide(tool, args)
         if decision.allowed:
             result = run()
             self._record_governed(tool, args, decision, executed=True)
+            self._note_untrusted_tool(tool)
             return result
 
         self._record_governed(tool, args, decision, executed=False)
@@ -128,6 +236,11 @@ class Guard:
         executed after an allowed `decide_only`. The vote-shape adapter's
         single audit write on the allowed path."""
         self._record_governed(tool, args, decision, executed=True)
+        # Vote shape runs the tool outside the guard, so this is the only
+        # point where the guard learns it actually ran. Without it, a
+        # vote-shape adapter would never taint and every declared
+        # untrusted tool would be invisible to run context.
+        self._note_untrusted_tool(tool)
 
     def record_withheld(self, tool: str, args: Dict[str, Any], decision: Decision) -> None:
         """Record exactly one governed receipt for an action KIFF withheld
