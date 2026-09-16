@@ -166,3 +166,74 @@ describe("vote shape", () => {
     expect(guard.untrustedInput).toBe(true);
   });
 });
+
+/**
+ * The second fact: sensitive reads.
+ *
+ * RFC 039 gained a second condition after the prompt-injection lab
+ * measured the first one. Gating on taint alone held 90 of 90 benign
+ * runs, because the agent began every run by reading a public issue — a
+ * condition that is always true refuses the same set of actions as a
+ * condition nobody checks. The conjunction of taint and a sensitive read
+ * fires on the chain actually forming.
+ *
+ * Mirrors tests/test_run_context_sensitive.py so the SDKs cannot drift.
+ */
+describe("run context: sensitive reads", () => {
+  it("omits the key when the guard does not track sensitive reads", () => {
+    // The fail-open this shape could have shipped with. A guard that
+    // tracks taint but knows nothing about sensitive reads must not
+    // claim there were none: the cloud reads an absent key as
+    // "unasserted" and refuses, and `false` as "it did not happen" and
+    // allows. Only one is honest for a guard that was never watching.
+    const g = new Guard({ tenant: "t", untrustedTools: ["read_issue"] });
+    const ctx = g.runContext()!;
+    expect(ctx).toBeDefined();
+    expect("sensitive_read" in ctx).toBe(false);
+  });
+
+  it("asserts false when it is watching and the run is clean", () => {
+    const g = new Guard({ tenant: "t", sensitiveTools: ["read_secret"] });
+    expect(g.runContext()!.sensitive_read).toBe(false);
+  });
+
+  it("marks the run when a declared sensitive tool runs", () => {
+    const g = new Guard({ tenant: "t", sensitiveTools: ["read_secret"] });
+    g.observe("read_secret", {});
+    expect(g.sensitiveRead).toBe(true);
+    expect(g.runContext()!.sensitive_read).toBe(true);
+  });
+
+  it("turns tracking on when marked manually", () => {
+    const g = new Guard({ tenant: "t", runId: "r1" });
+    expect("sensitive_read" in g.runContext()!).toBe(false);
+    g.markSensitiveRead("vault:/db/password");
+    expect(g.runContext()!.sensitive_read).toBe(true);
+  });
+
+  it("is monotonic within a run", () => {
+    const g = new Guard({ tenant: "t", sensitiveTools: ["read_secret"] });
+    g.markSensitiveRead("x");
+    g.observe("summarize", {});
+    g.observe("post_comment", {});
+    expect(g.sensitiveRead).toBe(true);
+  });
+
+  it("startRun clears the fact but keeps the tracking", () => {
+    // A guard watching for sensitive reads before a run boundary is
+    // still watching after it, so the new run's false remains a claim
+    // it is entitled to make.
+    const g = new Guard({ tenant: "t", runId: "r1" });
+    g.markSensitiveRead("x");
+    g.startRun("r2");
+    const ctx = g.runContext()!;
+    expect(ctx.sensitive_read).toBe(false);
+    expect(ctx.run_id).toBe("r2");
+    expect(g.sensitiveRead).toBe(false);
+  });
+
+  it("sensitiveTools alone opts into run context", () => {
+    const g = new Guard({ tenant: "t", sensitiveTools: ["read_secret"] });
+    expect(g.runContext()).toBeDefined();
+  });
+});
