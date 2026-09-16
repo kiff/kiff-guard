@@ -4,7 +4,7 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
-## Unreleased — run context: sensitive reads
+## 1.4.0 — run context: sensitive reads
 
 ### Added
 
