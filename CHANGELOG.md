@@ -4,6 +4,62 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
+## Unreleased — run context: sensitive reads
+
+### Added
+
+**A second run-context fact, and a condition that uses both.** 1.3.0
+shipped `untrusted_input`, and kiff-cloud shipped an action rule keyed on
+it. Measured, that rule turned out not to discriminate: in the
+prompt-injection lab, **90 of 90 benign runs were tainted**, because the
+agent under test began every run by reading a public issue. A condition
+that is always true refuses the same set of actions as a condition nobody
+checks.
+
+Taint fires on the first link of a three-link chain — untrusted content
+arrives, something sensitive is read, something public is written — and
+every run of such an agent crosses that link. So there is now a second
+fact for the second link:
+
+```python
+guard = Guard(client=c, mode="enforce",
+              untrusted_tools={"read_public_issue", "fetch_url"},
+              sensitive_tools={"read_private_file", "get_secret"})
+```
+
+```ts
+const guard = new Guard({ client: c, mode: "enforce",
+                          untrustedTools: ["read_public_issue", "fetch_url"],
+                          sensitiveTools: ["read_private_file", "get_secret"] });
+```
+
+`sensitive_tools` / `sensitiveTools` names the tools whose results bring
+content the agent must not be free to forward. Same mechanics as the
+untrusted set, different question: that one asks where instructions could
+have come from, this one asks what the run has seen that it must not
+leak. `mark_sensitive_read()` / `markSensitiveRead()` is the manual path.
+Both are monotonic within a run and cleared only by `start_run()`.
+
+An action can then declare `on_untrusted_sensitive_read` instead of
+`on_untrusted_input`, and is held only when both facts are true. In the
+lab that took false positives from **100% to 28.6%** with no loss of
+detection.
+
+### Upgrading
+
+**Nothing changes unless you name sensitive tools.** A guard that does
+not track sensitive reads sends **no `sensitive_read` key at all** —
+never `false`. This is the load-bearing detail: the cloud reads an absent
+key as "unasserted" and refuses an action that depends on it, and would
+read `false` as "no sensitive read happened" and allow. A guard that was
+never watching is not entitled to the negative claim, and a `false` it
+did not establish would turn a fail-closed into a fail-open.
+
+So if you adopt `on_untrusted_sensitive_read` cloud-side, you **must**
+also declare `sensitive_tools` on the guard, or every decision on that
+action fails closed. That is the correct behaviour and it is not a
+useful one.
+
 ## 1.3.0 — trusted run context
 
 ### Added

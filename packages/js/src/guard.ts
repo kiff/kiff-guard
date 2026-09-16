@@ -57,6 +57,24 @@ export interface GuardOptions {
    * and calling it can only ever ADD taint, never remove it.
    */
   untrustedTools?: Iterable<string>;
+
+  /**
+   * Tools whose results bring content the agent should not be free to
+   * forward: a private repository, a secret store, a record outside the
+   * run's remit.
+   *
+   * Same mechanics as `untrustedTools` and a different question — that
+   * set asks where instructions could have come from, this one asks what
+   * the run has seen that it must not leak. Together they describe the
+   * chain the control exists to break: untrusted content arrives,
+   * something sensitive is read, something public is written.
+   *
+   * An action can gate on the conjunction (`on_untrusted_sensitive_read`)
+   * rather than on taint alone, which matters because taint alone does
+   * not discriminate on an agent whose work begins by reading a public
+   * issue — measured at 90 of 90 benign runs tainted.
+   */
+  sensitiveTools?: Iterable<string>;
 }
 
 export interface GuardConnectOptions {
@@ -80,9 +98,20 @@ export class Guard {
   readonly receipts: Receipt[];
   /** @see GuardOptions.untrustedTools */
   readonly untrustedTools: ReadonlySet<string>;
+  /** @see GuardOptions.sensitiveTools */
+  readonly sensitiveTools: ReadonlySet<string>;
   private runId: string;
   private untrustedInputSeen = false;
+  private sensitiveReadSeen = false;
   private runContextOn: boolean;
+  // Tracked separately from runContextOn, because asserting
+  // `sensitive_read: false` is a claim this guard can only make if it is
+  // actually watching for sensitive reads. A guard that names no
+  // sensitive tools and never calls markSensitiveRead omits the key, and
+  // the cloud fails closed on an action that gates on it. Sending a
+  // false it did not establish would turn that fail-closed into a
+  // fail-open — the one mistake this field is shaped to prevent.
+  private sensitiveTrackingOn: boolean;
 
   constructor(opts: GuardOptions = {}) {
     const mode = opts.mode ?? "observe";
@@ -104,6 +133,8 @@ export class Guard {
     // trusted integrator code — and never by the model.
     this.runId = opts.runId ?? "";
     this.untrustedTools = new Set(opts.untrustedTools ?? []);
+    this.sensitiveTools = new Set(opts.sensitiveTools ?? []);
+    this.sensitiveTrackingOn = this.sensitiveTools.size > 0;
     // Opt-in, and off until the integrator asks for it. A guard that
     // never opts in sends no run_context and calls Client.decide with its
     // original signature, so every Client written before RFC 039 —
@@ -113,7 +144,10 @@ export class Guard {
     // declares a run-context dependency and receives no assertion fails
     // closed cloud-side. Sending nothing means "I have not established
     // anything", never "this run is clean".
-    this.runContextOn = this.runId !== "" || this.untrustedTools.size > 0;
+    this.runContextOn =
+      this.runId !== "" ||
+      this.untrustedTools.size > 0 ||
+      this.sensitiveTools.size > 0;
   }
 
   /**
@@ -134,20 +168,48 @@ export class Guard {
   }
 
   /**
-   * Begin a new run: clears the untrusted-input assertion and sets the
-   * run id. It is an integrator action by construction — the model has no
-   * route to it — which is what makes clearing taint here safe and
-   * clearing it anywhere else not. There is deliberately no untaint().
+   * Assert that this run has been served sensitive content. Monotonic,
+   * like taint: once asserted it holds until startRun().
+   *
+   * `sensitiveTools` does this automatically for tools named up front;
+   * this is the manual path for everything else. Calling it also turns on
+   * the tracking flag, because a guard that reports a sensitive read is
+   * by definition watching for them.
+   */
+  markSensitiveRead(source = ""): void {
+    this.sensitiveReadSeen = true;
+    this.sensitiveTrackingOn = true;
+    this.runContextOn = true;
+    if (source) {
+      this.catalog.record(this.agent, `kiff.sensitive_read:${source}`, {});
+    }
+  }
+
+  /**
+   * Begin a new run: clears the run's asserted facts and sets the run id.
+   * It is an integrator action by construction — the model has no route
+   * to it — which is what makes clearing taint here safe and clearing it
+   * anywhere else not. There is deliberately no untaint().
+   *
+   * Clears the facts, not the tracking: a guard watching for sensitive
+   * reads before a run boundary is still watching after it, so the new
+   * run's `false` stays a claim it is entitled to make.
    */
   startRun(runId = ""): void {
     this.runId = runId;
     this.untrustedInputSeen = false;
+    this.sensitiveReadSeen = false;
     this.runContextOn = true;
   }
 
   /** Whether this run has been marked as having consumed untrusted input. */
   get untrustedInput(): boolean {
     return this.untrustedInputSeen;
+  }
+
+  /** Whether this run has been marked as having read sensitive content. */
+  get sensitiveRead(): boolean {
+    return this.sensitiveReadSeen;
   }
 
   /**
@@ -163,6 +225,12 @@ export class Guard {
   runContext(): Record<string, unknown> | undefined {
     if (!this.runContextOn) return undefined;
     const ctx: Record<string, unknown> = { untrusted_input: this.untrustedInputSeen };
+    // Omitted unless this guard actually tracks sensitive reads. The
+    // cloud reads an absent key as "unasserted" and refuses an action
+    // that depends on it; it would read `false` as "it did not happen"
+    // and allow. Only one of those is honest for a guard that was never
+    // watching.
+    if (this.sensitiveTrackingOn) ctx.sensitive_read = this.sensitiveReadSeen;
     if (this.runId) ctx.run_id = this.runId;
     return ctx;
   }
@@ -176,6 +244,9 @@ export class Guard {
   private noteUntrustedTool(tool: string): void {
     if (this.untrustedTools.has(tool)) {
       this.untrustedInputSeen = true;
+    }
+    if (this.sensitiveTools.has(tool)) {
+      this.sensitiveReadSeen = true;
     }
   }
 

@@ -57,6 +57,7 @@ class Guard:
         ledger: Optional[List[Receipt]] = None,
         run_id: str = "",
         untrusted_tools: Iterable[str] = (),
+        sensitive_tools: Iterable[str] = (),
     ):
         if mode not in ("observe", "enforce"):
             raise ValueError("mode must be 'observe' or 'enforce'")
@@ -83,6 +84,31 @@ class Guard:
         self.run_id = run_id
         self.untrusted_tools = frozenset(untrusted_tools)
         self._untrusted_input = False
+        # `sensitive_tools` names the tools whose results bring content
+        # the agent should not be free to forward: a private repository,
+        # a secret store, a record outside the run's remit. Same
+        # mechanics as untrusted_tools and a different question — that
+        # set asks where instructions could have come from, this one
+        # asks what the run has seen that it must not leak.
+        #
+        # Together they describe the chain the control exists to break:
+        # untrusted content arrives, something sensitive is read, and
+        # something public is written. An action can gate on the
+        # conjunction (`on_untrusted_sensitive_read`) instead of on
+        # taint alone, which matters because taint alone does not
+        # discriminate on an agent whose work begins by reading a public
+        # issue — measured at 90 of 90 benign runs tainted.
+        self.sensitive_tools = frozenset(sensitive_tools)
+        self._sensitive_read = False
+        # Tracked separately from _run_context_on, because asserting
+        # `sensitive_read: false` is a claim this guard can only make if
+        # it is actually watching for sensitive reads. A guard that
+        # names no sensitive tools and never calls mark_sensitive_read
+        # omits the key entirely, and the cloud fails closed on an
+        # action that gates on it. Sending a false it did not establish
+        # would convert that fail-closed into a fail-open — the one
+        # mistake this field is shaped to prevent.
+        self._sensitive_tracking_on = bool(self.sensitive_tools)
         # Run context is opt-in, and stays off until the integrator asks
         # for it by naming untrusted tools, setting a run id, or calling
         # mark_untrusted_input/start_run. A guard that never opts in sends
@@ -95,7 +121,9 @@ class Guard:
         # declares a run-context dependency and receives no assertion
         # fails closed cloud-side. Sending nothing means "I have not
         # established anything", not "this run is clean".
-        self._run_context_on = bool(run_id) or bool(self.untrusted_tools)
+        self._run_context_on = (
+            bool(run_id) or bool(self.untrusted_tools) or bool(self.sensitive_tools)
+        )
 
     # ---- run context (kiff-cloud RFC 039) -------------------------------
     #
@@ -122,14 +150,37 @@ class Guard:
         if source:
             self.catalog.record(self.agent, f"kiff.untrusted_input:{source}", {})
 
+    def mark_sensitive_read(self, source: str = "") -> None:
+        """Assert that this run has been served sensitive content.
+        Monotonic, like taint: once asserted it holds until `start_run`.
+
+        Call it where the sensitive content actually arrives. The
+        `sensitive_tools` set does it automatically for tools named up
+        front; this is the manual path for everything else.
+
+        Calling this also turns on the tracking flag, because a guard
+        that reports a sensitive read is by definition watching for
+        them."""
+        self._sensitive_read = True
+        self._sensitive_tracking_on = True
+        self._run_context_on = True
+        if source:
+            self.catalog.record(self.agent, f"kiff.sensitive_read:{source}", {})
+
     def start_run(self, run_id: str = "") -> None:
-        """Begin a new run: clears the untrusted-input assertion and sets
-        the run id. Call it between independent tasks on a long-lived
+        """Begin a new run: clears the run's asserted facts and sets the
+        run id. Call it between independent tasks on a long-lived
         guard. It is an integrator action by construction — the model has
         no route to it — which is what makes clearing taint here safe and
-        clearing it anywhere else not."""
+        clearing it anywhere else not.
+
+        Clears the facts, not the tracking: a guard that was watching for
+        sensitive reads before the run boundary is still watching after
+        it, so `sensitive_read: false` on the new run is a claim it is
+        still entitled to make."""
         self.run_id = run_id
         self._untrusted_input = False
+        self._sensitive_read = False
         self._run_context_on = True
 
     @property
@@ -137,6 +188,12 @@ class Guard:
         """Whether this run has been marked as having consumed untrusted
         input. Read-only on purpose: see mark_untrusted_input."""
         return self._untrusted_input
+
+    @property
+    def sensitive_read(self) -> bool:
+        """Whether this run has been marked as having read sensitive
+        content. Read-only on purpose: see mark_sensitive_read."""
+        return self._sensitive_read
 
     def run_context(self) -> Optional[Dict[str, Any]]:
         """The run context to send with a decision.
@@ -153,6 +210,13 @@ class Guard:
         if not self._run_context_on:
             return None
         ctx: Dict[str, Any] = {"untrusted_input": self._untrusted_input}
+        # Omitted unless this guard actually tracks sensitive reads. The
+        # cloud reads an absent key as "unasserted" and refuses an action
+        # that depends on it; it would read `false` as "no sensitive read
+        # happened" and allow. Only one of those is true for a guard that
+        # was never watching.
+        if self._sensitive_tracking_on:
+            ctx["sensitive_read"] = self._sensitive_read
         if self.run_id:
             ctx["run_id"] = self.run_id
         return ctx
@@ -167,12 +231,15 @@ class Guard:
         return self.client.decide(self.tenant, self.agent, tool, args, run_context=ctx)
 
     def _note_untrusted_tool(self, tool: str) -> None:
-        """Apply the declared untrusted-tool set. Called after a tool has
-        run, so the taint lands on everything the agent does *next* — the
-        causal order that matters. Reading a public issue is not itself
-        the problem; what the agent does afterwards is."""
+        """Apply the declared untrusted-tool and sensitive-tool sets.
+        Called after a tool has run, so the facts land on everything the
+        agent does *next* — the causal order that matters. Reading a
+        public issue is not itself the problem, and neither is reading a
+        private file; what the agent does afterwards is."""
         if tool in self.untrusted_tools:
             self._untrusted_input = True
+        if tool in self.sensitive_tools:
+            self._sensitive_read = True
 
     def observe(self, tool: str, args: Dict[str, Any]) -> None:
         """Record an observed receipt and learn the catalog. No decision,
