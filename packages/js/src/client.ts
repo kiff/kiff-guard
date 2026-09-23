@@ -41,7 +41,8 @@ export interface Client {
 
 /** Runtime metadata sent to KIFF Cloud when a guard opts into discovery. */
 export interface GuardConnectInput {
-  agentId: string;
+  /** Omit when the API key is bound to an agent; Cloud supplies its identity. */
+  agentId?: string;
   adapter: string;
   mode: "observe" | "enforce";
   project?: string;
@@ -298,18 +299,15 @@ export class HTTPClient implements Client {
   }
 
   async connectGuard(input: GuardConnectInput): Promise<GuardConnection> {
-    if (!input.agentId) {
-      throw new Error("agentId is required");
-    }
     if (!input.adapter) {
       throw new Error("adapter is required");
     }
 
     const body: Record<string, unknown> = {
-      agent_id: input.agentId,
       adapter: input.adapter,
       mode: input.mode,
     };
+    if (input.agentId) body.agent_id = input.agentId;
     if (input.project) body.project = input.project;
     if (input.environment) body.environment = input.environment;
     if (input.workflow) body.workflow = input.workflow;
@@ -329,19 +327,16 @@ export class HTTPClient implements Client {
   }
 
   async observeGuard(input: GuardObservationInput): Promise<GuardObservation> {
-    if (!input.agentId) {
-      throw new Error("agentId is required");
-    }
     if (!input.adapter) {
       throw new Error("adapter is required");
     }
 
     const body: Record<string, unknown> = {
-      agent_id: input.agentId,
       adapter: input.adapter,
       mode: input.mode,
       tools: input.tools.map(wireToolObservation),
     };
+    if (input.agentId) body.agent_id = input.agentId;
     if (input.project) body.project = input.project;
     if (input.environment) body.environment = input.environment;
     if (input.workflow) body.workflow = input.workflow;

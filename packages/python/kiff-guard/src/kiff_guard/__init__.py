@@ -60,4 +60,4 @@ __all__ = [
 
 # A literal works in both installed packages and source checkouts. The
 # manifest-matching test keeps it aligned with the published version.
-__version__ = "1.5.0"
+__version__ = "1.6.0"

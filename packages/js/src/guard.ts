@@ -92,7 +92,7 @@ export interface GuardConnectOptions {
 export class Guard {
   readonly client?: Client;
   readonly tenant: string;
-  readonly agent: string;
+  agent: string;
   readonly mode: GuardMode;
   readonly catalog: Catalog;
   readonly receipts: Receipt[];
@@ -101,6 +101,7 @@ export class Guard {
   /** @see GuardOptions.sensitiveTools */
   readonly sensitiveTools: ReadonlySet<string>;
   private runId: string;
+  private readonly agentExplicit: boolean;
   private untrustedInputSeen = false;
   private sensitiveReadSeen = false;
   private runContextOn: boolean;
@@ -126,6 +127,7 @@ export class Guard {
     this.client = opts.client;
     this.tenant = opts.tenant ?? "";
     this.agent = opts.agent ?? "agent";
+    this.agentExplicit = opts.agent !== undefined;
     this.mode = mode;
     this.catalog = opts.catalog ?? new Catalog();
     this.receipts = opts.ledger ?? [];
@@ -329,8 +331,8 @@ export class Guard {
     if (!isGuardConnector(this.client)) {
       throw new Error("connect requires a client with connectGuard");
     }
-    return this.client.connectGuard({
-      agentId: this.agent,
+    const connection = await this.client.connectGuard({
+      agentId: this.agentExplicit ? this.agent : undefined,
       adapter: opts.adapter,
       mode: this.mode,
       project: opts.project,
@@ -338,6 +340,11 @@ export class Guard {
       workflow: opts.workflow,
       sdkVersion: opts.sdkVersion,
     });
+    if (!connection.agentId) {
+      throw new Error("guard connect returned no agent_id");
+    }
+    this.agent = connection.agentId;
+    return connection;
   }
 
   /**

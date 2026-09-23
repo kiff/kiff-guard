@@ -59,6 +59,18 @@ print(result.valid, result.issues)       # the draft now shows up in Studio
 to the cloud draft store. It's opt-in (separate from observe/enforce), so
 zero-config audit stays local unless you explicitly call it.
 
+To register a live guard with a key bound to an agent, omit `agent`:
+
+```python
+guard = Guard(client=HTTPClient(api_key="kiff_live_...", tool_map=ToolMap()),
+              mode="observe")
+connection = guard.connect(adapter="agno")
+print(connection.agent_id)  # identity supplied by KIFF Cloud
+```
+
+`connect` uses Cloud's returned agent name for later decisions. With an
+unbound key, pass `agent="your-agent"` explicitly; Cloud still requires it.
+
 ## Enforce — once you have a tenant and an active domain
 
 ```python

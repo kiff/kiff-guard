@@ -15,12 +15,17 @@ class StubClient implements Client {
 
 class StubConnector extends StubClient implements GuardConnector {
   connectCalls: GuardConnectInput[] = [];
+  decidedAgents: string[] = [];
+  async decide(_tenant: string, agent: string, _tool: string, _args: Record<string, unknown>): Promise<Decision> {
+    this.decidedAgents.push(agent);
+    return new Decision("allowed", "", "prop_1");
+  }
   async connectGuard(input: GuardConnectInput): Promise<GuardConnection> {
     this.connectCalls.push(input);
     return {
       project: input.project ?? "default",
       environment: input.environment ?? "dev",
-      agentId: input.agentId,
+      agentId: input.agentId ?? "bound-agent",
       workflow: input.workflow ?? "default",
       adapter: input.adapter,
       sdkVersion: input.sdkVersion,
@@ -136,6 +141,16 @@ describe("evaluate (middleware convenience)", () => {
 });
 
 describe("connect", () => {
+  it("uses the identity returned for a bound key", async () => {
+    const client = new StubConnector();
+    const guard = new Guard({ client, mode: "enforce" });
+    const connection = await guard.connect({ adapter: "openclaw" });
+    expect(client.connectCalls[0]?.agentId).toBeUndefined();
+    expect(connection.agentId).toBe("bound-agent");
+    expect(guard.agent).toBe("bound-agent");
+    await guard.decideOnly("tool", {});
+    expect(client.decidedAgents).toEqual(["bound-agent"]);
+  });
   it("forwards guard runtime identity to a Cloud-capable client", async () => {
     const client = new StubConnector();
     const guard = new Guard({ client, tenant: "t", agent: "ap-agent", mode: "enforce" });

@@ -120,6 +120,10 @@ await guard.connect({
 
 Cloud stores the tenant from the API key plus the project, environment, agent,
 workflow, adapter, SDK version, mode, first/last seen time, and heartbeat count.
+When the API key is bound to an agent, omit `agent` in the Guard constructor:
+`connect()` leaves `agent_id` out of the request and uses the agent name
+returned by Cloud for later decisions. With an unbound key, set `agent`
+explicitly; Cloud still requires it.
 
 ## Adapters
 
