@@ -58,20 +58,6 @@ __all__ = [
     "export_yaml",
 ]
 
-# Single source of truth is the package metadata in pyproject.toml. This is
-# read at import time rather than duplicated, because the value is sent to
-# KIFF on every decide call as sdk_version — a literal that drifts from the
-# published version silently mislabels every request in the field.
-#
-# The fallback covers running from a source tree that was never installed
-# (a plain PYTHONPATH import), where no distribution metadata exists.
-try:
-    from importlib.metadata import PackageNotFoundError, version as _pkg_version
-
-    try:
-        __version__ = _pkg_version("kiff-guard")
-    except PackageNotFoundError:  # source checkout, not installed
-        __version__ = "0.0.0+unknown"
-    del _pkg_version, PackageNotFoundError
-except ImportError:  # pragma: no cover - importlib.metadata is stdlib on 3.9+
-    __version__ = "0.0.0+unknown"
+# A literal works in both installed packages and source checkouts. The
+# manifest-matching test keeps it aligned with the published version.
+__version__ = "1.5.0"

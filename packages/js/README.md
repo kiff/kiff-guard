@@ -74,6 +74,7 @@ import { Guard, HTTPClient, ToolMap } from "@kiff/kiff-guard";
 
 const client = new HTTPClient({
   apiKey: "kiff_live_...",
+  domain: "card-refund", // active domain for this guard
   toolMap: new ToolMap().bind("refund_order", "REFUND_ORDER", "Order", "order_id"),
 });
 const guard = new Guard({ client, tenant: "<tenant>", agent: "support", mode: "enforce" });

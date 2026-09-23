@@ -1,6 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { HTTPClient, ToolMap } from "./client.js";
 
+describe("HTTPClient.decide — domain selection", () => {
+  it("sends a selected domain as a proposal field", async () => {
+    let body: Record<string, unknown> = {};
+    const client = new HTTPClient({
+      apiKey: "kiff_live_test",
+      toolMap: new ToolMap().bind("refund", "REFUND", "Order", "order_id"),
+      domain: "card-refund",
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init?.body as string);
+        return new Response(JSON.stringify({ outcome: "allowed" }), { status: 200 });
+      },
+    });
+    await client.decide("t", "agent", "refund", { order_id: "o1" });
+    expect(body.domain).toBe("card-refund");
+    expect(body.parameters).toEqual({});
+  });
+
+  it("omits domain when using the tenant default", async () => {
+    let body: Record<string, unknown> = {};
+    const client = new HTTPClient({
+      apiKey: "kiff_live_test",
+      toolMap: new ToolMap().bind("refund", "REFUND", "Order", "order_id"),
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init?.body as string);
+        return new Response(JSON.stringify({ outcome: "allowed" }), { status: 200 });
+      },
+    });
+    await client.decide("t", "agent", "refund", { order_id: "o1" });
+    expect(body).not.toHaveProperty("domain");
+  });
+});
+
 describe("HTTPClient.connectGuard", () => {
   it("posts guard runtime metadata to KIFF Cloud", async () => {
     const calls: { url: string; init: RequestInit }[] = [];

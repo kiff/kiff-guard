@@ -4,6 +4,13 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
+## 1.5.0 — explicit domain selection
+
+- Python and TypeScript `HTTPClient` can select a KIFF domain for decide
+  requests. When omitted, KIFF uses the tenant's default domain.
+- Python reports the package version from a source checkout as well as an
+  installed package.
+
 ## 1.4.0 — run context: sensitive reads
 
 ### Added
