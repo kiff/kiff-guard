@@ -34,6 +34,20 @@ describe("HTTPClient.decide — domain selection", () => {
 });
 
 describe("HTTPClient.connectGuard", () => {
+  it("omits agent_id for a bound key and uses Cloud's agent name", async () => {
+    let body: Record<string, unknown> = {};
+    const client = new HTTPClient({
+      apiKey: "kiff_live_test",
+      toolMap: new ToolMap(),
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init?.body as string);
+        return new Response(JSON.stringify({ agent_id: "bound-agent" }), { status: 200 });
+      },
+    });
+    const connection = await client.connectGuard({ adapter: "openclaw", mode: "observe" });
+    expect(body).not.toHaveProperty("agent_id");
+    expect(connection.agentId).toBe("bound-agent");
+  });
   it("posts guard runtime metadata to KIFF Cloud", async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const fetchImpl: typeof fetch = async (url, init) => {
@@ -117,6 +131,20 @@ describe("HTTPClient.connectGuard", () => {
 });
 
 describe("HTTPClient.observeGuard", () => {
+  it("omits agent_id for a bound key", async () => {
+    let body: Record<string, unknown> = {};
+    const client = new HTTPClient({
+      apiKey: "kiff_live_test",
+      toolMap: new ToolMap(),
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init?.body as string);
+        return new Response(JSON.stringify({ observation: { agent_id: "bound-agent", tools: [] } }), { status: 200 });
+      },
+    });
+    const observation = await client.observeGuard({ adapter: "openclaw", mode: "observe", tools: [] });
+    expect(body).not.toHaveProperty("agent_id");
+    expect(observation.agentId).toBe("bound-agent");
+  });
   it("posts an observed tool catalog to KIFF Cloud", async () => {
     const calls: { url: string; init: RequestInit }[] = [];
     const fetchImpl: typeof fetch = async (url, init) => {

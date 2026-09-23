@@ -4,6 +4,13 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
+## 1.6.0 — bound agent identity
+
+- Python and TypeScript guards may omit the agent name when using a key
+  bound to an agent. Connect and observations omit `agent_id`; after
+  connect, the guard uses the agent name returned by KIFF Cloud.
+- Explicit agent names remain supported for unbound keys.
+
 ## 1.5.0 — explicit domain selection
 
 - Python and TypeScript `HTTPClient` can select a KIFF domain for decide

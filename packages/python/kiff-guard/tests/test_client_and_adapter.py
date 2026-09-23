@@ -55,6 +55,40 @@ def test_client_sends_selected_domain_on_decide():
     assert "domain" not in cap["body"]["parameters"]
 
 
+def test_bound_key_connect_omits_agent_id_and_uses_cloud_identity():
+    cap = {}
+    client = _client(cap)
+
+    def connect_post(path, body):
+        cap["path"], cap["body"] = path, body
+        if path == "/v1/guard/connect":
+            return 200, {"agent_id": "bound-agent"}
+        return 200, {"outcome": "allowed"}
+
+    client._post = connect_post
+    guard = Guard(client=client, mode="observe")
+    connection = guard.connect(adapter="agno")
+    assert cap["path"] == "/v1/guard/connect"
+    assert "agent_id" not in cap["body"]
+    assert connection.agent_id == guard.agent == "bound-agent"
+    guard.decide_only("start_shift", {"shift_id": "s9"})
+    assert cap["body"]["actor_id"] == "bound-agent"
+
+
+def test_unbound_key_connect_keeps_explicit_agent_id():
+    cap = {}
+    client = _client(cap)
+
+    def connect_post(path, body):
+        cap["body"] = body
+        return 200, {"agent_id": body["agent_id"]}
+
+    client._post = connect_post
+    guard = Guard(client=client, agent="named-agent", mode="observe")
+    guard.connect(adapter="agno")
+    assert cap["body"]["agent_id"] == "named-agent"
+
+
 def test_source_version_matches_manifest():
     manifest = Path(__file__).resolve().parents[1] / "pyproject.toml"
     assert f'version = "{__version__}"' in manifest.read_text(encoding="utf-8")

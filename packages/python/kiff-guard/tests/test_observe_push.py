@@ -171,12 +171,26 @@ def _client():
     return HTTPClient(api_key="kiff_live_t_x", tool_map=_bound_map(), base_url="https://api.example")
 
 
-def test_http_observe_guard_requires_agent_and_adapter():
+def test_http_observe_guard_requires_adapter_and_tools():
     c = _client()
-    with pytest.raises(ValueError, match="agent_id"):
-        c.observe_guard(agent_id="", adapter="agno", mode="enforce", tools=[])
     with pytest.raises(ValueError, match="adapter"):
         c.observe_guard(agent_id="a", adapter="", mode="enforce", tools=[])
+    with pytest.raises(ValueError, match="tools"):
+        c.observe_guard(adapter="agno", mode="enforce")
+
+
+def test_http_observe_guard_omits_agent_for_bound_key(monkeypatch):
+    c = _client()
+    captured = {}
+
+    def fake_post(path, body):
+        captured.update(body)
+        return 200, {"observation": {"agent_id": "bound-agent", "tools": []}}
+
+    monkeypatch.setattr(c, "_post", fake_post)
+    observation = c.observe_guard(adapter="agno", mode="observe", tools=[])
+    assert "agent_id" not in captured
+    assert observation.agent_id == "bound-agent"
 
 
 def test_http_observe_guard_wire_shape_omits_unset_fields(monkeypatch):

@@ -51,7 +51,7 @@ class Guard:
         self,
         client: Optional[Client] = None,
         tenant: str = "",
-        agent: str = "agent",
+        agent: Optional[str] = None,
         mode: str = "observe",
         catalog: Optional[Catalog] = None,
         ledger: Optional[List[Receipt]] = None,
@@ -67,7 +67,8 @@ class Guard:
             raise ValueError("enforce mode requires a client")
         self.client = client
         self.tenant = tenant
-        self.agent = agent
+        self.agent = agent if agent is not None else "agent"
+        self._agent_explicit = agent is not None
         self.mode = mode
         self.catalog = catalog if catalog is not None else Catalog()
         self.receipts: List[Receipt] = ledger if ledger is not None else []
@@ -338,8 +339,8 @@ class Guard:
             raise ValueError("connect requires a client")
         if not hasattr(self.client, "connect_guard"):
             raise ValueError("connect requires a client with connect_guard (HTTPClient)")
-        return self.client.connect_guard(  # type: ignore[union-attr]
-            agent_id=self.agent,
+        connection = self.client.connect_guard(  # type: ignore[union-attr]
+            agent_id=self.agent if self._agent_explicit else "",
             adapter=adapter,
             mode=self.mode,
             project=project,
@@ -347,6 +348,10 @@ class Guard:
             workflow=workflow,
             sdk_version=sdk_version,
         )
+        if not connection.agent_id:
+            raise ValueError("guard connect returned no agent_id")
+        self.agent = connection.agent_id
+        return connection
 
     def save_draft(self, domain_name: str) -> Any:
         """Save the domain draft derived from observed traffic to the KIFF

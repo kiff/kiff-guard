@@ -132,9 +132,9 @@ class GuardConnector(Protocol):
 
     def connect_guard(
         self,
-        agent_id: str,
-        adapter: str,
-        mode: str,
+        agent_id: str = "",
+        adapter: str = "",
+        mode: str = "",
         project: str = "",
         environment: str = "",
         workflow: str = "",
@@ -344,9 +344,9 @@ class HTTPClient:
 
     def connect_guard(
         self,
-        agent_id: str,
-        adapter: str,
-        mode: str,
+        agent_id: str = "",
+        adapter: str = "",
+        mode: str = "",
         project: str = "",
         environment: str = "",
         workflow: str = "",
@@ -356,10 +356,11 @@ class HTTPClient:
         appear in the dashboard grouped by project/environment/agent/workflow.
         Call periodically (every 60s) as a heartbeat."""
         body: Dict[str, Any] = {
-            "agent_id": agent_id,
             "adapter": adapter,
             "mode": mode,
         }
+        if agent_id:
+            body["agent_id"] = agent_id
         if project:
             body["project"] = project
         if environment:
@@ -395,10 +396,10 @@ class HTTPClient:
 
     def observe_guard(
         self,
-        agent_id: str,
-        adapter: str,
-        mode: str,
-        tools: List[GuardToolObservation],
+        agent_id: str = "",
+        adapter: str = "",
+        mode: str = "",
+        tools: Optional[List[GuardToolObservation]] = None,
         project: str = "",
         environment: str = "",
         workflow: str = "",
@@ -412,17 +413,18 @@ class HTTPClient:
 
         Raises ConnectionError on transport failure or a non-2xx status,
         consistent with connect_guard / save_draft."""
-        if not agent_id:
-            raise ValueError("agent_id is required")
         if not adapter:
             raise ValueError("adapter is required")
+        if tools is None:
+            raise ValueError("tools is required")
 
         body: Dict[str, Any] = {
-            "agent_id": agent_id,
             "adapter": adapter,
             "mode": mode,
             "tools": [_wire_tool_observation(t) for t in tools],
         }
+        if agent_id:
+            body["agent_id"] = agent_id
         if project:
             body["project"] = project
         if environment:
