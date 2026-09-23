@@ -5,7 +5,7 @@ live api.kiff.dev decide endpoint:
 
     POST /v1/proposals/decide
     Authorization: Bearer kiff_live_<tenant>_<random>
-    body: {entity_id, entity_type, action_name, actor_id, parameters,
+    body: {entity_id, entity_type, action_name, actor_id, parameters, domain?,
            reasoning_summary?, confidence?, id?}
     -> {proposal_id, outcome, reasons[], message}
 
@@ -240,6 +240,7 @@ class HTTPClient:
         timeout: float = 10.0,
         unmapped: str = "withhold",
         allow_insecure_http: bool = False,
+        domain: str = "",
     ):
         if not api_key:
             raise ValueError("api_key is required")
@@ -251,6 +252,7 @@ class HTTPClient:
         self._base = base_url.rstrip("/")
         self._timeout = timeout
         self._unmapped = unmapped
+        self._domain = domain
 
     @property
     def tool_map(self) -> ToolMap:
@@ -304,6 +306,8 @@ class HTTPClient:
             "actor_id": agent,
             "parameters": {k: v for k, v in args.items() if k != binding.entity_arg},
         }
+        if self._domain:
+            body["domain"] = self._domain
         # Run context travels as a sibling of the proposal, never inside
         # `parameters` (kiff-cloud RFC 039). Parameters are the
         # model-supplied payload: a taint flag the model can write is one

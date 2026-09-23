@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from kiff_guard import Guard, HTTPClient, ToolMap, export_yaml  # noqa: E402
+from kiff_guard import Guard, HTTPClient, ToolMap, __version__, export_yaml  # noqa: E402
 from kiff_guard.adapters.agno import agno_hook  # noqa: E402
 
 
@@ -19,9 +20,9 @@ def _bound_map() -> ToolMap:
     )
 
 
-def _client(capture):
+def _client(capture, domain=""):
     tm = ToolMap().bind("start_shift", action="START_SHIFT", entity_type="Shift", entity_arg="shift_id")
-    c = HTTPClient(api_key="kiff_live_t_" + "y" * 32, tool_map=tm)
+    c = HTTPClient(api_key="kiff_live_t_" + "y" * 32, tool_map=tm, domain=domain)
 
     def fake_post(path, body):
         capture["path"] = path
@@ -43,6 +44,21 @@ def test_client_maps_tool_and_extracts_entity():
     assert cap["body"]["actor_id"] == "agent-a"
     assert cap["body"]["parameters"] == {"opened_by": "bob"}
     assert "shift_id" not in cap["body"]["parameters"]
+    assert "domain" not in cap["body"]
+
+
+def test_client_sends_selected_domain_on_decide():
+    cap = {}
+    c = _client(cap, domain="card-refund")
+    c.decide("t", "agent-a", "start_shift", {"shift_id": "s9"})
+    assert cap["body"]["domain"] == "card-refund"
+    assert "domain" not in cap["body"]["parameters"]
+
+
+def test_source_version_matches_manifest():
+    manifest = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    assert f'version = "{__version__}"' in manifest.read_text(encoding="utf-8")
+    assert __version__ != "0.0.0+unknown"
 
 
 def test_client_never_sends_roles():

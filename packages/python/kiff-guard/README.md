@@ -67,6 +67,7 @@ from kiff_guard.adapters.agno import agno_hook
 
 client = HTTPClient(
     api_key="kiff_live_...",                  # mint in the dashboard
+    domain="card-refund",                    # active domain for this guard
     tool_map=ToolMap().bind(
         "refund_order", action="REFUND_ORDER",
         entity_type="Order", entity_arg="order_id"),

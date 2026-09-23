@@ -135,6 +135,8 @@ export class ToolMap {
 export interface HTTPClientOptions {
   apiKey: string;
   toolMap: ToolMap;
+  /** KIFF domain selected for decide requests; omitted for the tenant default. */
+  domain?: string;
   baseUrl?: string;
   timeoutMs?: number;
   /** injectable for tests; defaults to the global fetch. */
@@ -186,6 +188,7 @@ export class HTTPClient implements Client {
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
   private readonly unmapped: "withhold" | "allow";
+  private readonly domain: string;
 
   constructor(opts: HTTPClientOptions) {
     if (!opts.apiKey) {
@@ -198,6 +201,7 @@ export class HTTPClient implements Client {
     this.unmapped = unmapped;
     this.apiKey = opts.apiKey;
     this.toolMap = opts.toolMap;
+    this.domain = opts.domain ?? "";
     const baseUrl = opts.baseUrl ?? "https://api.kiff.dev";
     requireSecureBaseUrl(baseUrl, opts.allowInsecureHttp ?? false);
     this.base = baseUrl.replace(/\/+$/, "");
@@ -258,6 +262,7 @@ export class HTTPClient implements Client {
       actor_id: agent,
       parameters,
     };
+    if (this.domain) body.domain = this.domain;
     // Run context travels as a sibling of the proposal, never inside
     // `parameters` (kiff-cloud RFC 039). Parameters are the model-supplied
     // payload: a taint flag the model can write is one an injected
