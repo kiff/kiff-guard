@@ -1,7 +1,8 @@
 # @kiff/kiff-guard (TypeScript)
 
-Drop-in KIFF clearance for any agent's tool calls — **observe** to audit,
-**enforce** to govern. The TypeScript SDK, a faithful port of the Python
+Check each of your agent's tool calls with KIFF before the tool runs, against
+the agent's [KIFF Card](https://kiff.dev/docs/kiff-cards) — **observe** to see
+what it does, **enforce** to hold or refuse what falls outside. The TypeScript SDK, a faithful port of the Python
 [`kiff-guard`](../python/kiff-guard) core.
 
 It speaks the same versioned decide contract (`POST /v1/proposals/decide`,

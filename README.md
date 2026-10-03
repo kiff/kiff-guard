@@ -1,28 +1,37 @@
 # kiff-guard
 
-**Connect an existing agent to KIFF.** `kiff-guard` is the client SDK +
-adapter layer for teams that already have agents and want their real tool calls
-to pass through KIFF before consequential side effects run.
+**Put an agent you already run under a KIFF Card.** `kiff-guard` is the client
+SDK and framework adapters that check each of your agent's tool calls with
+KIFF before the tool runs.
+
+A [KIFF Card](https://kiff.dev) is the authority a business gives one agent:
+which actions it may take, how much per action and in total over a window, and
+what happens to a call outside it (it waits for the owner, or it is refused).
+The owner changes or revokes the Card without changing the agent. kiff-guard is
+how an agent in your own code reaches that check.
 
 One guard, two modes:
 
-- **observe** — runs every tool, records an audit trail, and learns the
-  action catalog. No KIFF account, no domain, no API call required. The
-  fastest way to see what your agents actually do.
-- **enforce** — asks KIFF to decide *before* each tool runs: `allowed`
-  proceeds, anything else (`approval_required` / `blocked` / `invalid` /
-  any future outcome) withholds. Fail-safe by construction.
+- **observe** runs every tool, records an audit trail, and learns which tools
+  the agent calls. No KIFF account, no domain, no API call. It shows you what
+  the agent actually does, which is what you need to write its Card.
+- **enforce** asks KIFF to decide *before* each tool runs, against the domain
+  and the agent's Card. `allowed` proceeds; anything else
+  (`approval_required`, `blocked`, `invalid`, or any future outcome) withholds
+  the call. Fail-safe by construction.
 
-The same one-line integration that governs your agent at runtime also
-**derives a starter KIFF domain** from real traffic — so you never start
-from a blank policy file.
+The same one-line integration also **derives a starter KIFF domain** from real
+traffic, so you never start from a blank policy file.
 
-> Part of [KIFF](https://kiff.dev) — the open-source operational foundation
-> for agentic systems. Build the domain once, then connect any agent.
-> This repo is the **client SDK + framework adapters**, MIT-licensed and
-> community-maintainable. The framework lives at
-> [`kiff/kiff`](https://github.com/kiff/kiff); the hosted runtime is
-> KIFF Cloud.
+> Part of [KIFF](https://kiff.dev). This repo is the **client SDK and framework
+> adapters**, MIT-licensed. The decision engine is the open-source framework at
+> [`kiff/kiff`](https://github.com/kiff/kiff). Cards, owner approvals and
+> signed receipts are part of KIFF Cloud.
+>
+> **Agent calls MCP tools?** You may not need this SDK: point the agent at the
+> KIFF MCP gateway (`mcp.kiff.dev`) and KIFF checks each call against its Card
+> with no code change. See
+> [kiff.dev/docs/connect-an-agent](https://kiff.dev/docs/connect-an-agent).
 
 ## Connect path
 
@@ -37,7 +46,10 @@ Connect starts from the agent you already run:
    entity hints, required parameters, and the runtime/source evidence they came
    from.
 4. **Enforce** by pointing the same guard at a KIFF runtime. Every tool call asks
-   for a decision first: `allowed` runs, anything else withholds.
+   for a decision first: `allowed` runs, anything else withholds. With an API
+   key bound to the agent, the guard proposes as that agent, so the decision
+   draws on the agent's Card: a call over its limit is held for the owner or
+   refused before the tool runs.
 
 The framework repo (`kiff/kiff`) owns the domain/runtime kernel. This repo owns
 the connection layer: SDK primitives, framework adapters, observe/enforce

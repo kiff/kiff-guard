@@ -1,7 +1,9 @@
 # kiff-guard
 
-Drop-in KIFF clearance in front of any agent's tool calls. One guard,
-two modes:
+Check each of your agent's tool calls with KIFF before the tool runs. With
+an API key bound to the agent, every decision draws on the agent's
+[KIFF Card](https://kiff.dev/docs/kiff-cards): which actions it may take, how
+much, and what happens to a call outside it. One guard, two modes:
 
 - **observe** — runs every tool, records an audit trail, and learns the
   action catalog. **No KIFF account, no domain, no API call required.**
