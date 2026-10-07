@@ -38,6 +38,7 @@ under an unexpired permit.
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 from typing import Any, Callable, Dict, Iterable, List, Optional
@@ -121,6 +122,8 @@ class Verifier:
         self.policy = policy
         self._clock = clock
         self._owner = "v-" + uuid.uuid4().hex[:12]
+        self._sweep_lock = threading.Lock()
+        self._last_sweep = float("-inf")
 
     # -- stage 1 -----------------------------------------------------------
 
@@ -230,9 +233,10 @@ class Verifier:
 
     def sweep(self, adapters: Dict[str, Adapter]) -> List[Outcome]:
         """Settle every started row whose lease has expired (a process died
-        mid-call) with its tool's lookup. Run it on start-up and
-        periodically: a call whose response was lost is never presented
-        again by KIFF, so only the sweep settles it."""
+        mid-call) with its tool's lookup. Run it on start-up and then
+        periodically (``sweep_every`` or ``maybe_sweep``): a call whose
+        response was lost is never presented again by KIFF, so only a sweep
+        settles it, and only once its lease has expired."""
         out = []
         for row in self.store.expired(self._clock()):
             adapter = adapters.get(row.tool)
@@ -240,6 +244,40 @@ class Verifier:
                 continue
             out.append(self._settle(row, adapter))
         return out
+
+    def maybe_sweep(self, adapters: Dict[str, Adapter], every: float = 60) -> Optional[List[Outcome]]:
+        """Sweep if the last sweep from this verifier was at least ``every``
+        seconds ago. For request-driven runtimes (a Lambda function): call it
+        on each request, and also on a schedule, because a crash whose lease
+        had not expired at restart is only settled by a sweep after it
+        expires. Returns None when no sweep was due."""
+        now = self._clock()
+        with self._sweep_lock:
+            if now - self._last_sweep < every:
+                return None
+            self._last_sweep = now
+        return self.sweep(adapters)
+
+    def sweep_every(self, adapters: Dict[str, Adapter], every: float = 30) -> Callable[[], None]:
+        """Sweep now and then every ``every`` seconds on a daemon thread, for
+        long-running processes. Returns a function that stops it.
+
+        A sweep at start-up alone is not enough: a row claimed by a process
+        that died moments before the restart still holds an unexpired lease,
+        and KIFF never presents that operation again, so only a later sweep
+        settles it."""
+        stop = threading.Event()
+
+        def loop() -> None:
+            while not stop.is_set():
+                try:
+                    self.sweep(adapters)
+                except Exception:  # a failed sweep is retried at the next tick
+                    pass
+                stop.wait(every)
+
+        threading.Thread(target=loop, name="kiff-permit-sweep", daemon=True).start()
+        return stop.set
 
     def unknown(self) -> Iterable[Row]:
         """Operations whose outcome a person must check."""

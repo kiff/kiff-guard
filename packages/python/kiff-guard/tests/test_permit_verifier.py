@@ -420,3 +420,40 @@ def test_relay_runs_only_listed_tools_with_a_permit(rig):
     assert unknown["error"]["code"] == -32602
     _, listed = relay_call(app, {"jsonrpc": "2.0", "id": 3, "method": "tools/list"})
     assert [t["name"] for t in listed["result"]["tools"]] == [TOOL]
+
+
+# -- recovery keeps running ----------------------------------------------------
+
+# A process dies after claiming; it restarts before the lease expires. The
+# start-up sweep finds nothing to settle, and KIFF never presents the op
+# again, so a later sweep must settle it once the lease expires.
+def test_restart_before_lease_expiry_is_settled_by_a_later_sweep(rig):
+    v, s, clock, store = rig
+    tool = FakeRefunds()
+    store.claim("op-1", TOOL, args_sha256(ARGS), ARGS, "dead-process", clock.t, 120)
+    tool.refunds["op-1"] = {"id": "re_op-1"}  # it had refunded before dying
+    clock.t += 5  # prompt restart
+    assert v.maybe_sweep({TOOL: tool}, every=60) == []  # lease still live
+    assert store.get("op-1").state == "started"
+    clock.t += 30
+    assert v.maybe_sweep({TOOL: tool}, every=60) is None  # not due yet
+    clock.t += 120
+    assert [o.state for o in v.maybe_sweep({TOOL: tool}, every=60)] == ["succeeded"]
+    assert store.get("op-1").state == "succeeded" and tool.executed == []
+
+
+def test_sweep_every_settles_without_a_restart(tmp_path):
+    s = Signer()
+    store = SQLiteStore(str(tmp_path / "ops.db"))
+    v = Verifier(issuer=ISS, audience=AUD, tenant=TENANT, store=store, lease=0.2,
+                 keys=PinnedKeys([PinnedKey("k1", s.pub, time.time() + 60)]))
+    tool = FakeRefunds()
+    store.claim("op-1", TOOL, args_sha256(ARGS), ARGS, "dead-process", time.time(), 0.2)
+    stop = v.sweep_every({TOOL: tool}, every=0.05)
+    try:
+        deadline = time.time() + 3
+        while store.get("op-1").state == "started" and time.time() < deadline:
+            time.sleep(0.05)
+    finally:
+        stop()
+    assert store.get("op-1").state == "unknown" and tool.executed == []
