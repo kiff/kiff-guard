@@ -20,6 +20,7 @@ from a blank `kiff.yaml`.
 ```bash
 pip install kiff-guard            # core, zero deps
 pip install "kiff-guard[agno]"    # + the Agno adapter's framework
+pip install "kiff-guard[verifier]"  # + verify KIFF's execution permits in your own tool
 ```
 
 ## Quickstart — audit your agent in under 5 minutes (zero config)
@@ -156,6 +157,53 @@ caller's identity, not granting it.
 For stacks the SDKs don't cover (Ruby, Go, shell), a proposal is a single
 HTTP POST — see
 [`cookbook/custom-agent-http`](../../../cookbook/custom-agent-http/).
+
+## Verify KIFF's permit in your own tool (no key at KIFF)
+
+When an agent calls your tool through the KIFF gateway, KIFF can hold no
+key to it at all. Put the tool's connection in `verify` mode: for each
+allowed call, KIFF sends a short-lived **execution permit** in the
+`KIFF-Permit` header, and the tool checks it before it does anything
+([RFC 046](https://kiff.dev/docs/tool-permits)).
+
+```bash
+pip install "kiff-guard[verifier]"
+```
+
+```python
+from kiff_guard.permit import JWKSKeys, SQLiteStore, Verifier
+from kiff_guard.permit.stripe import StripeRefunds
+
+verifier = Verifier(
+    issuer="https://api.kiff.dev",
+    audience="https://refunds.example.com/mcp",  # what you set on the connection
+    tenant="<your KIFF account id>",
+    keys=JWKSKeys(),                              # KIFF's published keys, refetched every 5 min
+    store=SQLiteStore("/var/lib/refunds/permits.db"),
+)
+refunds = StripeRefunds(os.environ["STRIPE_KEY"], resolve=lambda a: {
+    "payment_intent": lookup_payment(a["order_number"]), "amount": a["amount_eur"] * 100})
+
+# in your MCP tools/call handler:
+outcome = verifier.run(headers["KIFF-Permit"], "refund_order", arguments, refunds)
+verifier.sweep({"refund_order": refunds})         # on start-up and periodically
+```
+
+What it guarantees:
+
+- The call runs only with a permit KIFF signed for **this** tool, account and
+  arguments, within 90 seconds of KIFF's decision (60 s lifetime plus 30 s of
+  clock tolerance).
+- Each operation runs **at most once**, across retries, concurrent requests
+  and restarts. A call whose answer was lost is looked up, never resent; what
+  cannot be settled is reported as `unknown` (`verifier.unknown()`).
+- What it does not change: KIFF still decides the call. Whoever holds KIFF's
+  signing key could authorize calls until verifiers stop trusting it, so
+  `JWKSKeys(distrust=[...])` and your own `policy=` limits are yours to set.
+
+For a service you do not run (Stripe, Zendesk), wrap the same verifier in
+`kiff_guard.permit.relay.Relay` and run it next to your vault; KIFF connects
+to it in `relay` mode.
 
 ## Architecture
 

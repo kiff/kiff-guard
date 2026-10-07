@@ -1,0 +1,27 @@
+{
+ "args_sha256": "e9d0e6fb91c819cad7bcceb3342be391c543d1f024f82decb8058db91dee53d8",
+ "arguments": {
+  "order_number": "1042",
+  "amount_eur": 80,
+  "reason": "damaged",
+  "idempotency_key": "op-fixture"
+ },
+ "audience": "https://refunds.example.com/mcp",
+ "issuer": "https://api.kiff.dev",
+ "jwks": {
+  "keys": [
+   {
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "TQ7DoNA_7_-TqbzOKiS0BtRvRK7_H3eH2u2xPKr6QCw",
+    "kid": "fixture-1",
+    "alg": "Ed25519",
+    "use": "sig"
+   }
+  ]
+ },
+ "now": 1800000000,
+ "tenant": "tenant-fixture",
+ "token": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZml4dHVyZS0xIiwidHlwIjoia2lmZi1wZXJtaXQrand0In0.eyJpc3MiOiJodHRwczovL2FwaS5raWZmLmRldiIsImF1ZCI6Imh0dHBzOi8vcmVmdW5kcy5leGFtcGxlLmNvbS9tY3AiLCJzdWIiOiJhZ2VudC1maXh0dXJlIiwiaWF0IjoxODAwMDAwMDAwLCJleHAiOjE4MDAwMDAwNjAsImp0aSI6InBtdF9jYTRkZDM2YmVjOTY2NDRjN2JmNGIwNTMzMWJiN2I2YSIsImF1dGhvcml6YXRpb25fZGV0YWlscyI6W3sidHlwZSI6Imh0dHBzOi8va2lmZi5kZXYvcGVybWl0cy90b29sLWNhbGwiLCJ0ZW5hbnQiOiJ0ZW5hbnQtZml4dHVyZSIsInRvb2wiOiJyZWZ1bmRfb3JkZXIiLCJhcmdzX3NoYTI1NiI6ImU5ZDBlNmZiOTFjODE5Y2FkN2JjY2ViMzM0MmJlMzkxYzU0M2QxZjAyNGY4MmRlY2I4MDU4ZGI5MWRlZTUzZDgiLCJvcCI6Im9wLWZpeHR1cmUiLCJjYXJkIjoiY2FyZC1maXh0dXJlIiwiZGVjaXNpb24iOiJvcC1maXh0dXJlIn1dfQ.S721Oq1ZhcmdJwzst8KZTK0J4fc9duPx_IpXG9Og4_Y7JyETeWv7CRW5KCqjhDMxCeB97DU75YUxFAhb5oZoAw",
+ "tool": "refund_order"
+}

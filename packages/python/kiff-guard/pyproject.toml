@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kiff-guard"
-version = "1.6.0"
+version = "1.7.0"
 description = "Check each of an AI agent's tool calls with KIFF before it runs, against the agent's KIFF Card: observe to see what it does, enforce to hold or refuse what falls outside."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -56,7 +56,10 @@ strands = ["strands-agents>=1.0,<2"]
 haystack = ["haystack-ai>=2.0,<3"]
 microsoft-agent-framework = ["agent-framework-core>=1.0,<2"]
 llama-index = ["llama-index-core>=0.14,<0.15"]       # AgentWorkflow.call_tool seam verified on the 0.14 line
-dev = ["pytest", "pyyaml"]
+# The execution-permit verifier (kiff_guard.permit, RFC 046): Ed25519 from
+# the cryptography package, so no JOSE library negotiates an algorithm.
+verifier = ["cryptography>=42"]
+dev = ["pytest", "pyyaml", "cryptography>=42"]
 
 [project.urls]
 Homepage = "https://kiff.dev"
