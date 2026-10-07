@@ -75,6 +75,12 @@ class Outcome:
 class Adapter:
     """How one downstream call is made and recovered. Subclass it.
 
+    ``prepare`` does any read-only work the call needs (looking a resource
+    up) and returns what ``execute`` sends. It must not change anything
+    downstream. The verifier checks the permit is still live after
+    ``prepare`` and immediately before ``execute``, so ``execute`` must make
+    its one effectful request at once, without slow work before it.
+
     ``execute`` makes the call once and classifies the answer: return
     ``Outcome("succeeded", result)``, ``Outcome("failed", result)`` for a
     final refusal from the service, or ``Outcome("unknown")`` when the
@@ -90,7 +96,10 @@ class Adapter:
     #: Calls that move money or change accounts must be recoverable.
     moves_money = True
 
-    def execute(self, op: str, arguments: Dict[str, Any]) -> Outcome:  # pragma: no cover - interface
+    def prepare(self, op: str, arguments: Dict[str, Any]) -> Any:
+        return arguments
+
+    def execute(self, op: str, prepared: Any) -> Outcome:  # pragma: no cover - interface
         raise NotImplementedError
 
     def lookup(self, op: str, arguments: Dict[str, Any]) -> Optional[Outcome]:
@@ -146,7 +155,11 @@ class Verifier:
             raise PermitError("wrong_tenant", "the permit is for another KIFF account")
         if d.get("tool") != tool:
             raise PermitError("wrong_tool", "the permit is for another tool")
-        if d.get("args_sha256") != args_sha256(arguments):
+        try:
+            received = args_sha256(arguments)
+        except (TypeError, ValueError):
+            raise PermitError("invalid_arguments", "the arguments cannot be hashed exactly (an integer beyond 2**53 - 1, or a value JSON does not have)") from None
+        if d.get("args_sha256") != received:
             raise PermitError("args_mismatch", "the arguments received are not the ones KIFF authorized")
         op = d.get("op")
         if not isinstance(op, str) or not op:
@@ -192,12 +205,18 @@ class Verifier:
         if not self.store.claim(op, tool, h, arguments, self._owner, now, self.lease):
             row = self.store.get(op)
             return self._recorded(row, h, adapter) if row else Outcome("in_progress")
-        # Checked again immediately before sending, not only when claimed.
+        try:
+            prepared = adapter.prepare(op, arguments)
+        except Exception as e:  # read-only work failed: nothing was sent
+            self.store.finish(op, self._owner, "not_sent", {"error": str(e)}, "prepare_failed", self._clock())
+            return Outcome("not_sent", {"error": str(e)}, reason="prepare_failed", message="the call could not be prepared; nothing was sent")
+        # Checked again after the read-only preparation and immediately
+        # before the effectful request, not only when claimed.
         if not self._live(d["exp"]):
             self.store.finish(op, self._owner, "not_sent", None, "expired_before_send", self._clock())
             return Outcome("not_sent", reason="expired_before_send", message="the permit expired before the call was sent")
         try:
-            out = adapter.execute(op, arguments)
+            out = adapter.execute(op, prepared)
         except Exception as e:  # the adapter could not say what happened
             out = Outcome("unknown", reason="adapter_error", message=type(e).__name__)
         if out.state not in ("succeeded", "failed", "unknown"):

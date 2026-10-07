@@ -385,7 +385,7 @@ class FakeStripe:
 def test_stripe_adapter_uses_the_op_as_key_and_metadata():
     fake = FakeStripe()
     a = StripeRefunds("sk_test_x", lambda args: {"payment_intent": "pi_1", "amount": args["amount_eur"] * 100}, opener=fake)
-    out = a.execute("op-1", ARGS)
+    out = a.execute("op-1", a.prepare("op-1", ARGS))
     assert out.state == "succeeded" and out.result["amount"] == 8000
     post = fake.requests[0]
     assert post.get_header("Idempotency-key") == "op-1"
@@ -457,3 +457,59 @@ def test_sweep_every_settles_without_a_restart(tmp_path):
     finally:
         stop()
     assert store.get("op-1").state == "unknown" and tool.executed == []
+
+
+# -- review on #66 ---------------------------------------------------------------
+
+# Integers beyond 2**53 - 1 alias as doubles: a permit for one id must not
+# verify for its neighbour, and the changed id must never reach the adapter.
+def test_integer_substitution_at_the_binary64_boundary_is_refused(rig):
+    import hashlib
+    v, s, clock, _ = rig
+    tool = FakeRefunds()
+    signed = {"customer_id": 9007199254740992, "idempotency_key": "op-1"}
+    # The hash a lossy implementation would compute for the signed id.
+    lossy = hashlib.sha256(b'{"customer_id":9007199254740992,"idempotency_key":"op-1"}').hexdigest()
+    tok = s.mint(clock.t, args=ARGS, detail={"args_sha256": lossy})
+    for args in ({"customer_id": 9007199254740993, "idempotency_key": "op-1"}, signed,
+                 {"nested": [{"id": -9007199254740993}], "idempotency_key": "op-1"}):
+        out = v.run(tok, TOOL, args, tool)
+        assert out.state == "refused" and out.reason == "invalid_arguments", args
+    assert tool.executed == []
+    # The largest safe integer still hashes and runs.
+    safe = {"customer_id": 9007199254740991, "idempotency_key": "op-1"}
+    assert v.run(s.mint(clock.t, args=safe), TOOL, safe, tool).state == "succeeded"
+    with pytest.raises(ValueError):
+        args_sha256({"x": 2**53})
+
+
+# The live-permit check is after the adapter's read-only preparation and
+# immediately before its effectful request: a slow lookup cannot move the
+# refund past the permit's window.
+def test_expiry_during_preparation_sends_nothing(rig):
+    v, s, clock, store = rig
+    fake = FakeStripe()
+
+    def slow_resolve(args):
+        clock.t += 20  # a slow read-only lookup
+        return {"payment_intent": "pi_1", "amount": args["amount_eur"] * 100}
+
+    adapter = StripeRefunds("sk_test_x", slow_resolve, opener=fake)
+    tok = s.mint(clock.t)
+    clock.t += 89  # verified within the window (iat + 89)
+    out = v.run(tok, TOOL, ARGS, adapter)
+    assert out.state == "not_sent" and out.reason == "expired_before_send"
+    assert [r for r in fake.requests if r.get_method() == "POST"] == []
+    assert store.get("op-1").state == "not_sent"
+    assert v.run(tok, TOOL, ARGS, adapter).state == "not_sent"  # final
+
+
+def test_a_failed_preparation_sends_nothing(rig):
+    v, s, clock, store = rig
+    fake = FakeStripe()
+
+    def missing(args):
+        raise ValueError("no paid order with that number")
+
+    out = v.run(s.mint(clock.t), TOOL, ARGS, StripeRefunds("sk_test_x", missing, opener=fake))
+    assert out.state == "not_sent" and out.reason == "prepare_failed" and fake.requests == []

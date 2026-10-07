@@ -72,18 +72,20 @@ class StripeRefunds(Adapter):
                 body = {}
             raise StripeError(e.code, body) from None
 
-    def execute(self, op: str, arguments: Dict[str, Any]) -> Outcome:
-        try:
-            ref = self.resolve(arguments)
-        except Exception as e:
-            # Nothing was sent: the refund could not even be described.
-            return Outcome("failed", {"error": str(e)}, reason="not_resolved")
+    def prepare(self, op: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Read-only: resolve the refund and build its parameters. A failure
+        here sends nothing."""
+        ref = self.resolve(arguments)
         params: Dict[str, Any] = {"payment_intent": ref["payment_intent"], "amount": int(ref["amount"]),
                                   "metadata[kiff_op]": op}
         for k, v in (ref.get("metadata") or {}).items():
             params["metadata[%s]" % k] = str(v)[:500]
         if ref.get("reason"):
             params["reason"] = ref["reason"]
+        return params
+
+    def execute(self, op: str, params: Dict[str, Any]) -> Outcome:
+        """The one effectful request, made at once."""
         try:
             r = self._request("POST", "/refunds", params, idem=op)
         except StripeError as e:

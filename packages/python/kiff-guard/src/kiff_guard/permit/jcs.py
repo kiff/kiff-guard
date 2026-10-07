@@ -16,7 +16,13 @@ import math
 from decimal import Decimal
 from typing import Any
 
-__all__ = ["canonicalize", "args_sha256"]
+__all__ = ["canonicalize", "args_sha256", "MAX_SAFE_INTEGER"]
+
+#: The largest integer every JSON number maps to exactly (2**53 - 1).
+#: RFC 8785 hashes numbers as IEEE 754 doubles, so two integers beyond it
+#: can hash the same while the tool receives different values. They are
+#: refused, here and in KIFF's issuer, so a hash names one value.
+MAX_SAFE_INTEGER = 2**53 - 1
 
 
 def args_sha256(arguments: Any) -> str:
@@ -39,8 +45,12 @@ def _encode(v: Any, out: list) -> None:
         out.append("true")
     elif v is False:
         out.append("false")
-    elif isinstance(v, (int, float)):
+    elif isinstance(v, int):
+        if abs(v) > MAX_SAFE_INTEGER:
+            raise ValueError("jcs: integer %d is beyond 2**53 - 1 and cannot be hashed without ambiguity" % v)
         out.append(_number(float(v)))
+    elif isinstance(v, float):
+        out.append(_number(v))
     elif isinstance(v, str):
         out.append(_string(v))
     elif isinstance(v, (list, tuple)):
