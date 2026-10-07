@@ -4,6 +4,28 @@ All notable changes to the guard SDKs. This file covers both packages in
 this repository — `kiff-guard` (PyPI) and `@kiff/kiff-guard` (npm) — which
 share a version number and are released from the same tag.
 
+## 1.7.0 — verify KIFF's execution permits (Python)
+
+- New `kiff_guard.permit` (install `kiff-guard[verifier]`): verify a KIFF
+  execution permit (RFC 046) inside your own tool, or run it as a relay that
+  holds the downstream key, so KIFF needs no key to the system the tool
+  changes.
+  - Checks `typ`, `alg: Ed25519` (never `EdDSA`), a trusted key, the issuer,
+    the tool's audience, the account, the tool, the exact arguments (RFC 8785
+    hash), and a lifetime of at most 60 seconds by default (never above 300).
+  - Runs each operation at most once, recorded in a durable store (SQLite in
+    the reference) with a lease. A new execution needs an unexpired permit,
+    checked again immediately before the call is sent. Recovery is read-only:
+    a lost answer is settled by the adapter's `lookup`, or left `unknown` for
+    a person, and is never resent.
+  - Key trust has bounds: the JWKS is refetched at least every 5 minutes, a
+    removed key stops being trusted at the next fetch, a set that cannot be
+    refreshed for an hour fails closed, pinned keys expire, and a local
+    distrust list overrides everything.
+  - Reference adapter for Stripe refunds (`StripeRefunds`) and a WSGI relay
+    (`Relay`) that serves only the tools it is configured with.
+- The TypeScript package is unchanged apart from the shared version number.
+
 ## 1.6.0 — bound agent identity
 
 - Python and TypeScript guards may omit the agent name when using a key
