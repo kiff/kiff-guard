@@ -1,0 +1,6 @@
+{
+  "api": "https://api.kiff.dev",
+  "provider": "deterministic",
+  "context_file": "refund-policy.example.json",
+  "poll_seconds": 15
+}
