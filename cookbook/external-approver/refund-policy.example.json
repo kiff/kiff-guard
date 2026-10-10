@@ -1,0 +1,12 @@
+{
+  "policy": {
+    "action": "issue_refund",
+    "target_argument": "order",
+    "amount_parameter": "amount_eur",
+    "max_amount": 100
+  },
+  "orders": {
+    "synthetic-order-1": {"refundable": true, "remaining_amount": 100},
+    "synthetic-order-2": {"refundable": false, "remaining_amount": 100}
+  }
+}
