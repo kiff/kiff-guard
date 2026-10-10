@@ -28,6 +28,16 @@ class ConnectorTests(unittest.TestCase):
         view["hold"]["arguments"]["order"] = "unknown"
         self.assertEqual(connector.deterministic_policy(view, context)[0], "defer")
 
+    def test_unknown_refund_eligibility_defers(self):
+        context = {"policy": {"action": "refund", "target_argument": "order", "amount_parameter": "amount", "max_amount": 100}, "orders": {"known": {"remaining_amount": 80}}}
+        view = {"hold": {"action": "refund", "arguments": {"order": "known"}, "parameters": {"amount": 75}}}
+        for eligibility in [None, "false", 0]:
+            with self.subTest(eligibility=eligibility):
+                context["orders"]["known"]["refundable"] = eligibility
+                self.assertEqual(connector.deterministic_policy(view, context)[0], "defer")
+        context["orders"]["known"]["refundable"] = False
+        self.assertEqual(connector.deterministic_policy(view, context)[0], "reject")
+
     def test_defer_is_not_repeated_until_review_changes(self):
         listed = {"holds": [{"hold": {"id": "h", "status": "held"}, "review_token": "r"}]}
         seen = {}

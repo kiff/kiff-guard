@@ -110,8 +110,10 @@ def deterministic_policy(view, context):
     fact = context.get("orders", {}).get(target) if isinstance(target, str) else None
     if hold.get("action") != policy["action"] or not fact or type(amount) is not int:
         return "defer", "deterministic-policy", "No independent business facts cover this action and target. Human review is required."
-    if fact.get("refundable") is not True:
+    if fact.get("refundable") is False:
         return "reject", "deterministic-policy", "The independent order record says this target is not refundable."
+    if fact.get("refundable") is not True:
+        return "defer", "deterministic-policy", "The independent order record does not establish refund eligibility. Human review is required."
     ceiling = min(policy["max_amount"], fact["remaining_amount"])
     if amount <= 0 or amount > ceiling:
         return "defer", "deterministic-policy", "The requested amount exceeds the independent refund policy or the order’s remaining amount. Human review is required."
