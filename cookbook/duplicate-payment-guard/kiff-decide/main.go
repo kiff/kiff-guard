@@ -12,10 +12,9 @@
 //	GET  /v1/entities/{id}/state  current state (for the proof)
 //	GET  /healthz
 //
-// The decide outcome vocabulary mirrors apps/api: allowed,
+// The decide outcome vocabulary mirrors KIFF's hosted API: allowed,
 // approval_required, blocked, invalid. The mapping from the runtime's
-// validation error to the wire outcome is identical to the cloud's
-// proposals.go, so the guard SDK behaves the same against this server as
+// validation error to the wire outcome is identical to the hosted API's, so the guard SDK behaves the same against this server as
 // against api.kiff.dev.
 package main
 

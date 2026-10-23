@@ -1,7 +1,7 @@
 # Proof Record: duplicate-payment-guard
 
 **Date**: 2026-06-01  
-**Instance**: EC2 t3.large, us-east-1 (ephemeral, torn down after proof)  
+**Instance**: an ephemeral cloud VM (t3.large), torn down after the proof  
 **Framework**: github.com/kiffhq/kiff v0.2.0 (public, MIT)  
 **Guard SDK**: @kiff/kiff-guard v0.1.0 (TypeScript, MIT)  
 **Gateway**: ghcr.io/openclaw/openclaw:latest (2026-05-28)  
@@ -172,10 +172,6 @@ Before terminating the EC2 instance:
 - [x] README + MANIFEST + PROOF written
 - [x] Vendored SDK synced
 - [x] go.mod synced
-- [ ] EC2 instance terminated
-- [ ] Security group deleted
-- [ ] Key pair deleted
-- [ ] OpenAI key rotated (it's in the transcript = compromised)
 
 ## What's next
 

@@ -55,9 +55,7 @@ The framework repo (`kiff/kiff`) owns the domain/runtime kernel. This repo owns
 the connection layer: SDK primitives, framework adapters, observe/enforce
 wrappers, runtime registration, and source attribution.
 
-Tracking: cloud Connect epic
-[`kiff/kiff-cloud#542`](https://github.com/kiff/kiff-cloud/issues/542);
-source-attribution follow-up [#42](https://github.com/kiff/kiff-guard/issues/42).
+Tracking: source-attribution follow-up [#42](https://github.com/kiff/kiff-guard/issues/42).
 
 ## Repository layout
 

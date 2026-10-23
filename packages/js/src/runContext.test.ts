@@ -1,7 +1,7 @@
 /**
  * Run context: the facts a harness asserts that the model cannot.
  *
- * kiff-cloud RFC 039. Mirrors the Python suite (tests/test_run_context.py)
+ * KIFF Cloud's run-context contract. Mirrors the Python suite (tests/test_run_context.py)
  * so the two SDKs cannot drift on the properties that make the assertion
  * worth anything: the model has no route to clearing it, and a guard that
  * never opts in sends nothing rather than silently claiming a clean run.

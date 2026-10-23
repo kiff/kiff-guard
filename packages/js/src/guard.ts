@@ -43,7 +43,7 @@ export interface GuardOptions {
   ledger?: Receipt[];
   /**
    * Identifier for the agent run these calls belong to, sent as run
-   * context so decisions within one run can be correlated (kiff-cloud
+   * context so decisions within one run can be correlated (KIFF Cloud's
    * RFC 039).
    */
   runId?: string;
@@ -131,7 +131,7 @@ export class Guard {
     this.mode = mode;
     this.catalog = opts.catalog ?? new Catalog();
     this.receipts = opts.ledger ?? [];
-    // Run context (kiff-cloud RFC 039). Asserted by this guard — which is
+    // Run context (KIFF Cloud's run-context contract). Asserted by this guard — which is
     // trusted integrator code — and never by the model.
     this.runId = opts.runId ?? "";
     this.untrustedTools = new Set(opts.untrustedTools ?? []);

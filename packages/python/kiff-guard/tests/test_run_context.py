@@ -1,6 +1,6 @@
 """Run context: the facts a harness asserts that the model cannot.
 
-kiff-cloud RFC 039. The guard is trusted integrator code, so it is the
+KIFF Cloud's run-context contract. The guard is trusted integrator code, so it is the
 right place to assert what happened in a run. These tests pin the two
 properties that make the assertion worth anything: the model has no route
 to clearing it, and a guard that never opts in sends nothing rather than

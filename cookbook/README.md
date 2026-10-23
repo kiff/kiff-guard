@@ -103,11 +103,11 @@ is identical in all three.
 
 | Recipe | Runtime ID | Adapter | Workflow |
 |--------|-----------|---------|----------|
-| refund-ceiling-guard | grt_7617bfedced8a04a | langgraph | refund-ceiling |
-| collections-promise-guard | grt_abf614d6f4bfba9c | agno | collections-promise |
-| chargeback-dispute-guard | grt_50a5e51abb54d5cb | strands | chargeback-dispute |
-| vulnerability-escalation-guard | grt_e21d38003d63d61e | agno | vulnerability-escalation |
-| kyb-verification-guard | grt_d66e423509953c46 | agno | kyb-verification |
+| refund-ceiling-guard | grt_xxxxxxxxxxxxxxxx | langgraph | refund-ceiling |
+| collections-promise-guard | grt_xxxxxxxxxxxxxxxx | agno | collections-promise |
+| chargeback-dispute-guard | grt_xxxxxxxxxxxxxxxx | strands | chargeback-dispute |
+| vulnerability-escalation-guard | grt_xxxxxxxxxxxxxxxx | agno | vulnerability-escalation |
+| kyb-verification-guard | grt_xxxxxxxxxxxxxxxx | agno | kyb-verification |
 
 ## Common structure
 

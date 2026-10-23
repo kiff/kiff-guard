@@ -72,7 +72,7 @@ class Guard:
         self.mode = mode
         self.catalog = catalog if catalog is not None else Catalog()
         self.receipts: List[Receipt] = ledger if ledger is not None else []
-        # Run context (kiff-cloud RFC 039). Asserted by this guard — which
+        # Run context (KIFF Cloud's run-context contract). Asserted by this guard — which
         # is trusted integrator code — and never by the model.
         #
         # `untrusted_tools` names the tools whose *results* bring content
@@ -126,7 +126,7 @@ class Guard:
             bool(run_id) or bool(self.untrusted_tools) or bool(self.sensitive_tools)
         )
 
-    # ---- run context (kiff-cloud RFC 039) -------------------------------
+    # ---- run context (KIFF Cloud's run-context contract) -------------------------------
     #
     # The runtime has no independent account of what happened in a run:
     # the only proposal fields that say *why* an action is proposed are

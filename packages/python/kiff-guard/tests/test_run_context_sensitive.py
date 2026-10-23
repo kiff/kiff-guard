@@ -1,6 +1,6 @@
 """The second run-context fact: sensitive reads.
 
-kiff-cloud RFC 039 gained a second condition after the prompt-injection
+KIFF Cloud's run-context contract gained a second condition after the prompt-injection
 lab measured the first one. Gating on taint alone held 90 of 90 benign
 runs, because the agent under test began every run by reading a public
 issue — a condition that is always true refuses the same set of actions

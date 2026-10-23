@@ -7,8 +7,8 @@
  */
 
 /**
- * The stable outcome vocabulary the KIFF decide endpoint returns. Mirrors
- * apps/api/internal/handlers/proposals.go. "observed" is guard-local: it
+ * The stable outcome vocabulary the KIFF decide endpoint returns.
+ * "observed" is guard-local: it
  * is what observe mode records when no decision was made.
  */
 export const ALLOWED = "allowed";

@@ -1,12 +1,12 @@
 # Proof Record: chargeback-dispute-guard
 
 **Date**: 2026-06-03
-**Instance**: EC2 t3.medium, us-east-1 (i-07e902e884c2124b8, 52.73.152.94)
+**Instance**: an ephemeral cloud VM (t3.medium), torn down after the proof
 **Framework**: github.com/kiffhq/kiff v0.2.0
 **Guard SDK**: kiff-guard Python v0.1.0
 **Agent framework**: Strands (BeforeToolCallEvent vote shape)
 **Model**: OpenAI gpt-4o-mini
-**KIFF Cloud runtime**: grt_50a5e51abb54d5cb
+**KIFF Cloud runtime**: grt_xxxxxxxxxxxxxxxx
 
 ## Results (verified live on EC2, 2026-06-03T19:55:48Z)
 
@@ -26,7 +26,7 @@ RESULT: 5 submissions, $125.00 in scheme fees — PENALTY RISK
 ### WITH KIFF (real Strands agent)
 ```
 dispute dsp-kiff-... seeded: state=INVESTIGATED
-  Connected to KIFF Cloud: runtime=grt_50a5e51abb54d5cb
+  Connected to KIFF Cloud: runtime=grt_xxxxxxxxxxxxxxxx
 agent (real gpt-4o-mini via Strands) submitting chargeback...
 Tool #1: submit_chargeback
 The chargeback for dispute dsp-kiff-... has been successfully submitted.
@@ -55,6 +55,5 @@ Exit code: 0 (proof passed)
 ## Teardown checklist
 
 - [x] Proof passed (exit 0)
-- [x] KIFF Cloud runtime active (grt_50a5e51abb54d5cb)
+- [x] KIFF Cloud runtime active (grt_xxxxxxxxxxxxxxxx)
 - [x] README + MANIFEST + PROOF written
-- [ ] EC2 instance terminates via 2h TTL

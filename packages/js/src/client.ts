@@ -265,7 +265,7 @@ export class HTTPClient implements Client {
     };
     if (this.domain) body.domain = this.domain;
     // Run context travels as a sibling of the proposal, never inside
-    // `parameters` (kiff-cloud RFC 039). Parameters are the model-supplied
+    // `parameters` (KIFF Cloud's run-context contract). Parameters are the model-supplied
     // payload: a taint flag the model can write is one an injected
     // instruction can clear, so the cloud refuses kiff_-prefixed keys
     // there rather than merging them.

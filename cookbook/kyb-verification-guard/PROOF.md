@@ -1,12 +1,12 @@
 # Proof Record: kyb-verification-guard
 
 **Date**: 2026-06-04
-**Instance**: EC2 t3.large, us-east-1d (i-008692d750b341a67, 13.221.5.207)
+**Instance**: an ephemeral cloud VM (t3.large), torn down after the proof
 **Framework**: github.com/kiffhq/kiff v0.2.0 (public, MIT)
 **Guard SDK**: kiff-guard Python v0.1.0 (MIT)
 **Agent framework**: Agno 2.6.11 — **Workflows** (agno_hook middleware shape)
 **Model**: OpenAI gpt-4o-mini
-**KIFF Cloud runtime**: grt_d66e423509953c46
+**KIFF Cloud runtime**: grt_xxxxxxxxxxxxxxxx
 
 ## What was proven
 
@@ -49,7 +49,7 @@ RESULT: 5 bureau checks, $60.00 in fees — WASTED SPEND + RE-SCREENING
 ### WITH KIFF (state-aware gate, real Agno Workflow)
 ```
 business biz-kiff-ad3205 seeded: Globex Ltd, state=PENDING
-  Connected to KIFF Cloud: runtime=grt_d66e423509953c46
+  Connected to KIFF Cloud: runtime=grt_xxxxxxxxxxxxxxxx
 running KYB pipeline as Agno Workflow (real gpt-4o-mini)...
   workflow response: KYB decision recorded. Prior step: Onboard business biz-kiff-ad3205.
                      Run the KYB check with registration_number=12345678...
@@ -99,7 +99,7 @@ Exit code: 0 (proof passed)
    clean; KIFF keeps the bureau call once-and-done.
 
 5. **KIFF Cloud visibility**: the runtime registered via `connect_guard()`
-   (grt_d66e423509953c46) and a heartbeat keeps it active.
+   (grt_xxxxxxxxxxxxxxxx) and a heartbeat keeps it active.
 
 ## Note on the Workflow dependency
 
@@ -112,9 +112,6 @@ rest blocked — is identical either way). `fastapi` is pinned in
 ## Teardown checklist
 
 - [x] Proof passed (exit 0)
-- [x] KIFF Cloud runtime active (grt_d66e423509953c46)
+- [x] KIFF Cloud runtime active (grt_xxxxxxxxxxxxxxxx)
 - [x] README + MANIFEST + PROOF written
 - [x] All source files in repo
-- [ ] EC2 instance terminates via 2h TTL (shutdown -h +120 at launch)
-- [ ] Security group + key pair cleaned up post-shutdown
-- [ ] OpenAI key to be rotated (in transcript)

@@ -45,7 +45,7 @@ share a version number and are released from the same tag.
 ### Added
 
 **A second run-context fact, and a condition that uses both.** 1.3.0
-shipped `untrusted_input`, and kiff-cloud shipped an action rule keyed on
+shipped `untrusted_input`, and KIFF Cloud shipped an action rule keyed on
 it. Measured, that rule turned out not to discriminate: in the
 prompt-injection lab, **90 of 90 benign runs were tainted**, because the
 agent under test began every run by reading a public issue. A condition
@@ -101,7 +101,7 @@ useful one.
 ### Added
 
 **Run context: the facts a harness asserts that the model cannot.** KIFF
-Cloud's decide API gained a `run_context` field (kiff-cloud RFC 039). The
+Cloud's decide API gained a `run_context` field (KIFF Cloud's run-context contract). The
 only proposal fields describing *why* an action is proposed —
 `reasoning_summary`, `confidence` — are written by the model, so the
 runtime had no independent account of the run. The guard is trusted

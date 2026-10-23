@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict
 
 
-# The stable outcome vocabulary the KIFF decide endpoint returns. Mirrors
-# apps/api/internal/handlers/proposals.go. "observed" is guard-local: it
+# The stable outcome vocabulary the KIFF decide endpoint returns.
+# "observed" is guard-local: it
 # is what observe mode records when no decision was made.
 ALLOWED = "allowed"
 APPROVAL_REQUIRED = "approval_required"

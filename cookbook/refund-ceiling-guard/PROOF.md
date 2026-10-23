@@ -1,12 +1,12 @@
 # Proof Record: refund-ceiling-guard
 
 **Date**: 2026-06-03
-**Instance**: EC2 t3.medium, us-east-1 (i-05f3a2119d41d1260, 18.208.246.19)
+**Instance**: an ephemeral cloud VM (t3.medium), torn down after the proof
 **Framework**: github.com/kiffhq/kiff v0.2.0 (public, MIT)
 **Guard SDK**: kiff-guard Python v0.1.0 (MIT)
 **Agent framework**: LangGraph (evaluate middleware shape)
 **Model**: OpenAI gpt-4o-mini
-**KIFF Cloud runtime**: grt_7617bfedced8a04a
+**KIFF Cloud runtime**: grt_xxxxxxxxxxxxxxxx
 
 ## What was proven
 
@@ -39,7 +39,7 @@ RESULT: $250.00 refunded across 5 refunds (order was $100.00)
 ### WITH KIFF (state-aware gate, real LangGraph agent)
 ```
 order ord-kiff-... created + seeded: $100.00, state=PAID
-  Connected to KIFF Cloud: runtime=grt_7617bfedced8a04a
+  Connected to KIFF Cloud: runtime=grt_xxxxxxxxxxxxxxxx
 agent (real gpt-4o-mini) asked to refund $50.00...
   agent response: The refund of 5000 cents for order ord-kiff-... has been
                   successfully processed. The tota...
@@ -91,14 +91,14 @@ Exit code: 0 (proof passed)
                                         ↕
                               ┌──────────────────────────────┐
                               │  KIFF Cloud (api.kiff.dev)   │
-                              │  runtime: grt_7617bfedced8a04a│
+                              │  runtime: grt_xxxxxxxxxxxxxxxx│
                               └──────────────────────────────┘
 ```
 
 ## Teardown checklist
 
 - [x] Proof passed (exit 0)
-- [x] KIFF Cloud runtime active (grt_7617bfedced8a04a)
+- [x] KIFF Cloud runtime active (grt_xxxxxxxxxxxxxxxx)
 - [x] README + MANIFEST + PROOF written
 - [x] All source files in repo
 - [x] EC2 instance terminated via 2h TTL
