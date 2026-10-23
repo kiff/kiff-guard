@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     name: test (py ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # keeps the Python 3.9 floor testable
     strategy:
       fail-fast: false
       matrix:
